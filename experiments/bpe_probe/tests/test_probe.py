@@ -111,3 +111,38 @@ def test_onpolicy_relabel_uses_bestofn_and_surprisal_budget():
     best_tokens, lengths = targets_from_rollouts(tokens, log_probs, max_mean_surprisal=1.0)
     assert best_tokens.tolist() == [[4, 5, 6]]
     assert lengths.tolist() == [2]
+
+
+def test_onepass_student_conditions_block_on_anchor_and_has_expected_shapes():
+    from train_onepass_anchor_student import OnePassAnchorStudent
+    from probe_anchor_horizon import load_teacher
+    teacher = load_teacher()
+    model = OnePassAnchorStudent(teacher, rank=2, horizon=3).eval()
+    x = torch.randint(0, teacher.config.vocab_size, (2, teacher.config.block_size))
+    anchor = torch.tensor([1, 2])
+    anchor_logits, block_logits = model(x, anchor_override=anchor)
+    assert anchor_logits.shape == (2, teacher.config.vocab_size)
+    assert block_logits.shape == (2, 4, teacher.config.vocab_size + 1)
+
+
+def test_onepass_decode_immediate_eob_still_emits_anchor():
+    from benchmark_onepass_anchor import decode_macro
+    vocab = 7
+    anchor_logits = torch.full((1, vocab), -10.0)
+    anchor_logits[0, 3] = 5.0
+    block_logits = torch.full((1, 4, vocab + 1), -10.0)
+    block_logits[0, 0, vocab] = 8.0
+    emitted = decode_macro(anchor_logits, block_logits, eob_id=vocab, max_continuation=3, eob_bias=0.0)
+    assert emitted.tolist() == [3]
+
+
+def test_onepass_fixed_k_emits_anchor_plus_k_continuations():
+    from benchmark_onepass_anchor import decode_macro_fixed
+    vocab = 7
+    anchor_logits = torch.full((1, vocab), -10.0)
+    anchor_logits[0, 3] = 5.0
+    block_logits = torch.full((1, 4, vocab + 1), -10.0)
+    block_logits[0, 0, 1] = 5.0
+    block_logits[0, 1, 2] = 5.0
+    emitted = decode_macro_fixed(anchor_logits, block_logits, eob_id=vocab, k=2)
+    assert emitted.tolist() == [3, 1, 2]
