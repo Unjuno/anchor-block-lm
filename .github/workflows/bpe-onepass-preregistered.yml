@@ -1,0 +1,39 @@
+name: bpe-onepass-preregistered
+
+on:
+  push:
+    branches: [bpe-predictability-probe]
+    paths:
+      - "experiments/bpe_probe/benchmark_onepass_preregistered.py"
+      - ".github/workflows/bpe-onepass-preregistered.yml"
+  workflow_dispatch:
+
+jobs:
+  preregistered:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: experiments/bpe_probe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install --upgrade pip
+      - name: Install CPU PyTorch
+        run: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
+      - run: pip install -r requirements.txt
+      - run: PYTHONPATH=. pytest -q
+      - run: python prepare_data.py
+      - run: python train_teacher.py --steps 1000
+      - run: python train_onepass_anchor_student.py prepare
+      - run: python train_onepass_anchor_student.py train --steps 1200
+      - run: python calibrate_onepass_eob.py prepare
+      - run: python calibrate_onepass_eob.py train --steps 500
+      - run: python benchmark_onepass_preregistered.py --test-prompts 64 --count 48
+      - run: cat results/onepass_preregistered_benchmark.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bpe-onepass-preregistered
+          path: experiments/bpe_probe/results/onepass_preregistered_benchmark.json

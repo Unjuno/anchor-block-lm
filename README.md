@@ -2,105 +2,165 @@
 
 A research prototype for **adaptive language-model decoding**:
 
-> commit one autoregressive anchor token, then generate the predictable continuation as a variable-length block.
+> keep the ordinary autoregressive token as an exact anchor, then use the same backbone state to emit a calibrated variable-length continuation block.
 
-The working hypothesis is that full autoregressive decoding is most valuable at high-uncertainty branching points. Once one token resolves a branch, part of the following continuation may become predictable enough to emit as a block.
+The working hypothesis is that full autoregressive decoding is most valuable at uncertain branching points. Once one token is realized, some following tokens become easier to predict and can sometimes be committed without another full backbone step.
 
-## Core idea
+## One-pass design
 
-```text
+~~~text
 context
-   │
-   ├─ autoregressive step ──> anchor token
-   │
-   └─ anchor-conditioned block model
-          ├─ token
-          ├─ token
-          ├─ ...
-          └─ <EOB>
-```
+   |
+one frozen backbone forward
+   |
+   +--> exact ordinary next-token logits --> anchor
+   |
+   +--> lightweight continuation branch
+        conditioned on (hidden state, realized anchor)
+            |
+            +--> continuation token
+            +--> continuation token
+            +--> ...
+            +--> <EOB>
+~~~
 
-`<EOB>` (end of block) is learned as part of the continuation model, so block length is not chosen from a fixed set at inference time.
+The autoregressive backbone and next-token path are fully frozen. Trainable low-rank updates exist only in the continuation branch. If the continuation branch stops immediately, the model reduces exactly to ordinary AR decoding for that step.
 
-The current prototype keeps the base nanoGPT weights frozen and adapts the continuation behavior with **LoRA + self-distillation**.
+This is intentionally different from a two-model draft-and-verify loop: inference does not call a separate teacher to verify each block.
 
-## Training sketch
+## Current evidence
 
-1. Train or load a standard autoregressive teacher.
-2. Sample one anchor token normally.
-3. From the anchor-conditioned context, draw multiple teacher continuations with top-p sampling.
-4. Estimate how far the continuation remains sufficiently concentrated.
-5. Train the student to emit the corresponding continuation followed by `<EOB>`.
-6. Re-label student-generated contexts with the teacher and run an on-policy self-distillation refresh.
+### Synthetic mechanism test
 
-The important distinction from speculative decoding is that the deployed student does **not** require a separate draft-and-verify loop for every block.
+The original character-level controlled experiment showed that a variable EOB policy can outperform a fixed continuation length at a similar backbone-call compression rate.
 
-## Preliminary result
+See [experiments/synthetic](experiments/synthetic).
 
-Current results are **controlled synthetic character-level experiments**, not a production LLM benchmark.
+### Natural-language BPE test
+
+A small byte-level-BPE nanoGPT experiment on *Romeo and Juliet* now reproduces the mechanism.
+
+The current preselected expanded test uses 64 held-out prompts × 48 generated BPE tokens. The EOB bias and random-gating probability were fixed before this expanded test.
 
 | Method | Tokens / backbone call | Local teacher agreement |
 |---|---:|---:|
-| Fixed continuation = 3 | 2.00 | 82.15% |
-| Variable EOB + on-policy refresh | 1.97 | **95.12%** |
+| exact AR fallback | 1.000 | **100.00%** |
+| fixed +1 continuation | 2.000 | 64.29% |
+| **variable EOB** | **1.103** | **98.11%** |
+| nearby-rate random 0/1 gating | 1.128 | 93.33% |
 
-These numbers are only evidence that the mechanism is learnable in a controlled setting. They do **not** establish production speedups, distribution preservation, or natural-language quality.
+Variable gating improves prompt-paired teacher agreement over random gating by **+4.79 percentage points**, bootstrap 95% CI **+3.65 to +5.89 pp**.
 
-## Reproduce the current proof-of-concept
+Three independent teacher/student/calibration seeds also reproduce the effect:
 
-The checked-in synthetic experiment lives in [`experiments/synthetic`](experiments/synthetic).
+| Metric | Mean ± sample std |
+|---|---:|
+| variable tokens / backbone call | **1.084 ± 0.032** |
+| variable teacher agreement | **98.81% ± 0.47%** |
+| random-gating teacher agreement | 93.83% ± 0.82% |
+| variable - random agreement | **+4.98 ± 1.02 pp** |
 
-```bash
+Across all three seeds, the AR fallback remained exactly teacher-equivalent and variable gating beat random gating in teacher agreement.
+
+See [experiments/bpe_probe](experiments/bpe_probe) for the full experiment history, failed variants, uncertainty probes, and reproduction commands.
+
+## Important limitations
+
+These results are **not** a production LLM speed benchmark.
+
+They currently establish only an algorithmic mechanism:
+
+- backbone-call count is reduced on a subset of states;
+- the exact AR fallback is preserved;
+- adaptive gating is better than random gating at a nearby compression rate.
+
+They do **not** yet establish:
+
+- GPU wall-clock speedup,
+- exact preservation of the teacher sampling distribution,
+- results on strong or large language models,
+- cross-dataset generalization,
+- optimized KV-cache behavior or kernels.
+
+The natural-language teacher is deliberately tiny and the current corpus split has measurable distribution shift.
+
+## Why an anchor helps
+
+A same-position information probe asks how much knowing the realized token X_(t+1) changes uncertainty about X_(t+2).
+
+On 256 held-out BPE contexts with 32 sampled anchors per context:
+
+- conditional mutual information: **1.083 nats / 1.562 bits**
+- teacher top-1 probability: **13.8% -> 24.6%**
+- positive information gain in **99.6%** of contexts
+
+This does not by itself imply that long blocks are easy, but it validates the central premise that the realized anchor contains useful information about the immediate future.
+
+## Self-distillation
+
+The current training path separates two problems:
+
+1. **continuation content** — learn future token heads from the frozen AR teacher;
+2. **commit horizon** — calibrate EOB from the student's actual consecutive agreement with the teacher under student-induced prefixes.
+
+Top-p sampling is retained as an uncertainty probe and future source of distribution-aware training signals. Earlier experiments that directly used strict top-p rollout-prefix agreement were too conservative on natural language; those negative results are kept in the repository.
+
+## Reproduce
+
+Synthetic experiment:
+
+~~~bash
 cd experiments/synthetic
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 PYTHONPATH=. pytest -q
 bash reproduce_synthetic.sh
-```
+~~~
 
-The pipeline trains the teacher, constructs top-p self-distillation targets, trains the anchor-conditioned variable-EOB student, performs an on-policy refresh, and reproduces the published benchmark.
+Natural-language BPE experiment:
+
+~~~bash
+cd experiments/bpe_probe
+python prepare_data.py
+python train_teacher.py --steps 1000
+
+python train_onepass_anchor_student.py prepare
+python train_onepass_anchor_student.py train --steps 1200
+
+python calibrate_onepass_eob.py prepare
+python calibrate_onepass_eob.py train --steps 500
+
+python benchmark_onepass_preregistered.py --test-prompts 64 --count 48
+~~~
 
 ## Current status
 
 - [x] Synthetic feasibility experiment
-- [x] Frozen base model + LoRA adaptation
-- [x] Anchor-conditioned multi-token continuation
-- [x] Learned `<EOB>` variable block length
-- [x] On-policy self-distillation refresh
-- [x] Checked-in synthetic reproduction code + tests
-- [ ] Natural-language BPE experiment
-- [ ] Multi-seed full training runs
-- [ ] Ablations: anchor / EOB / on-policy refresh
+- [x] Natural-language BPE feasibility experiment
+- [x] Exact frozen AR fallback
+- [x] One-pass anchor-conditioned continuation branch
+- [x] Learned/calibrated variable EOB
+- [x] Nearby-rate random-gating baseline
+- [x] Prompt-paired bootstrap
+- [x] Three independent training seeds
+- [x] CI and regression tests
+- [ ] Better natural-language dataset split / additional corpus
+- [ ] Stronger teacher
 - [ ] KV-cache + GPU benchmark
+- [ ] Kernel-level wall-clock optimization
 - [ ] Larger-model validation
-
-## Research questions
-
-1. How much does one committed anchor token reduce uncertainty over the following sequence?
-2. Can a learned block model exploit that reduction better than a fixed block length?
-3. How should safe block termination be calibrated?
-4. How much of the gain survives on natural-language BPE models?
-5. Can the method improve wall-clock latency once KV-cache and GPU kernels are included?
-
-## Scope
-
-This repository is intentionally a **research prototype**. The current goal is to establish whether the mechanism exists and can be trained reliably before scaling it to large models.
 
 ## Relationship to prior work
 
-The project is related to multi-token prediction, blockwise parallel decoding, sequence-level / on-policy distillation, speculative decoding, and adaptive computation / optimal stopping.
+The project is related to multi-token prediction, blockwise parallel decoding, sequence-level/self-distillation, speculative decoding, adaptive computation, and optimal stopping.
 
-The intended research direction differs in its emphasis on an **autoregressive anchor followed by a learned variable-length continuation block**.
+The intended research direction emphasizes an **exact autoregressive anchor path plus a separately trainable, confidence-calibrated continuation branch**.
 
 ## Implementation
 
-The first implementation is based on the design and code structure of [nanoGPT](https://github.com/karpathy/nanoGPT). The experiment vendors only the minimal model subset it needs and preserves the upstream MIT license under `experiments/synthetic/third_party/nanogpt`.
+The first implementation uses a minimal subset of [nanoGPT](https://github.com/karpathy/nanoGPT). The upstream MIT license is preserved under experiments/synthetic/third_party/nanogpt.
 
 ## License
 
 MIT License. See [LICENSE](LICENSE).
-
-## Disclaimer
-
-Preliminary metrics in this README come from small synthetic experiments. Do not interpret them as evidence of equivalent results on production-scale LLMs.

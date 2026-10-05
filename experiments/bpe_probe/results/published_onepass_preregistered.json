@@ -1,0 +1,40 @@
+{
+  "source_run": "https://github.com/Unjuno/anchor-block-lm/actions/runs/37299140398",
+  "status": "preselected expanded test; no test-time tuning",
+  "conditions": {
+    "test_prompts": 64,
+    "generated_tokens_per_prompt": 48,
+    "preselected_eob_bias": 2,
+    "preselected_random_p": 0.1327433628318584,
+    "base_model_frozen": true,
+    "note": "algorithmic backbone-call metric, not wall-clock GPU speed"
+  },
+  "ar": {
+    "tokens_per_backbone_call": 1,
+    "local_teacher_agreement": 1,
+    "local_teacher_nll": 2.012465948166664
+  },
+  "fixed1": {
+    "tokens_per_backbone_call": 2,
+    "local_teacher_agreement": 0.6429036458333334,
+    "local_teacher_nll": 3.105480133474354
+  },
+  "variable_eob": {
+    "tokens_per_backbone_call": 1.103448275862069,
+    "local_teacher_agreement": 0.9811197916666666,
+    "local_teacher_nll": 2.0325128522236655
+  },
+  "random01": {
+    "tokens_per_backbone_call": 1.1281674623576938,
+    "local_teacher_agreement": 0.9332682291666667,
+    "local_teacher_nll": 2.1806774399152955
+  },
+  "paired_variable_minus_random_agreement": {
+    "mean_difference": 0.0478515625,
+    "ci95": [
+      0.03645833333333333,
+      0.05891927083333333
+    ],
+    "fraction_positive_prompts": 0.8125
+  }
+}

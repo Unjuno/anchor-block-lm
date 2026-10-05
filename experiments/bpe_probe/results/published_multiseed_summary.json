@@ -1,0 +1,45 @@
+{
+  "source_run": "https://github.com/Unjuno/anchor-block-lm/actions/runs/37299365741",
+  "n_seeds": 3,
+  "seeds": [
+    {
+      "seed_index": 0,
+      "variable_speed": 1.0670371656825286,
+      "variable_agreement": 0.9925130208333333,
+      "random_speed": 1.1281674623576938,
+      "random_agreement": 0.9313151041666666,
+      "agreement_gain": 0.06119791666666663,
+      "ar_agreement": 1
+    },
+    {
+      "seed_index": 1,
+      "variable_speed": 1.12157721796276,
+      "variable_agreement": 0.9830729166666666,
+      "random_speed": 1.1281674623576938,
+      "random_agreement": 0.9361979166666666,
+      "agreement_gain": 0.046875,
+      "ar_agreement": 1
+    },
+    {
+      "seed_index": 2,
+      "variable_speed": 1.0640803602355386,
+      "variable_agreement": 0.9886067708333333,
+      "random_speed": 1.1281674623576938,
+      "random_agreement": 0.947265625,
+      "agreement_gain": 0.04134114583333326,
+      "ar_agreement": 1
+    }
+  ],
+  "aggregate": {
+    "variable_speed_mean": 1.084231581293609,
+    "variable_speed_std": 0.03237604219605932,
+    "variable_agreement_mean": 0.988064236111111,
+    "variable_agreement_std": 0.004743379556075153,
+    "random_agreement_mean": 0.938259548611111,
+    "random_agreement_std": 0.008172669295855292,
+    "agreement_gain_mean": 0.049804687499999965,
+    "agreement_gain_std": 0.01024744546790183,
+    "all_ar_fallback_exact": true,
+    "all_variable_better_than_random": true
+  }
+}

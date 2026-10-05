@@ -1,0 +1,59 @@
+name: bpe-predictability-probe
+
+on:
+  push:
+    branches: [bpe-predictability-probe]
+    paths:
+      - "experiments/bpe_probe/prepare_data.py"
+      - "experiments/bpe_probe/train_teacher.py"
+      - "experiments/bpe_probe/probe_anchor_horizon.py"
+      - "experiments/bpe_probe/probe_bestofn_blocks.py"
+      - "experiments/bpe_probe/probe_anchor_information.py"
+      - "experiments/bpe_probe/train_block_student.py"
+      - "experiments/bpe_probe/benchmark_block_student.py"
+      - "experiments/bpe_probe/onpolicy_block_refresh.py"
+      - "experiments/bpe_probe/benchmark_onpolicy_block.py"
+      - "experiments/bpe_probe/tests/test_probe.py"
+      - ".github/workflows/bpe-probe.yml"
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: experiments/bpe_probe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install --upgrade pip
+      - name: Install CPU PyTorch
+        run: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
+      - run: pip install -r requirements.txt
+      - run: PYTHONPATH=. pytest -q
+      - run: python -m py_compile prepare_data.py train_teacher.py probe_anchor_horizon.py probe_bestofn_blocks.py probe_anchor_information.py train_block_student.py benchmark_block_student.py onpolicy_block_refresh.py benchmark_onpolicy_block.py
+      - run: python prepare_data.py
+      - run: python train_teacher.py --steps 1000
+      - run: python probe_anchor_horizon.py --contexts 256 --rollouts 16 --horizon 6
+      - run: python probe_bestofn_blocks.py --contexts 256 --rollouts 16 --horizon 6
+      - run: python probe_anchor_information.py --contexts 256 --anchors-per-context 32
+      - run: python train_block_student.py prepare
+      - run: python train_block_student.py train --steps 1200
+      - run: python benchmark_block_student.py --dev-prompts 48 --test-prompts 96 --count 48
+      - run: python onpolicy_block_refresh.py prepare --starts 256 --cycles 4 --eob-bias -1.0
+      - run: python onpolicy_block_refresh.py train --steps 400
+      - run: python benchmark_onpolicy_block.py --dev-prompts 48 --test-prompts 96 --count 48
+      - run: cat results/predictability_probe.json
+      - run: cat results/bestofn_block_probe.json
+      - run: cat results/anchor_information_probe.json
+      - run: cat results/block_data_config.json
+      - run: cat results/block_benchmark.json
+      - run: cat results/block_onpolicy_config.json
+      - run: cat results/block_onpolicy_benchmark.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bpe-predictability-probe
+          path: experiments/bpe_probe/results/*.json
