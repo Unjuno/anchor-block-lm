@@ -42,3 +42,16 @@ def test_contiguous_min_probability_length_stops_at_first_weak_token():
         [0.1, 0.9, 0.9, 0.9],
     ])
     assert contiguous_min_probability_lengths(probs, 0.2).tolist() == [2, 0]
+
+
+def test_anchor_information_is_mutual_information_of_mixture():
+    from probe_anchor_information import information_from_conditionals
+    conditional = torch.tensor([[
+        [1.0, 0.0],
+        [0.0, 1.0],
+    ]])
+    stats = information_from_conditionals(conditional)
+    assert stats["mi_nats"][0].item() == pytest.approx(0.693147, rel=1e-5)
+    assert stats["mixture_entropy_nats"][0].item() == pytest.approx(0.693147, rel=1e-5)
+    assert stats["conditional_entropy_nats"][0].item() == pytest.approx(0.0)
+    assert stats["conditional_top1_gain"][0].item() == pytest.approx(0.5)
