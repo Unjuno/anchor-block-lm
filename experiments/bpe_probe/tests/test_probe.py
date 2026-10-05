@@ -115,8 +115,11 @@ def test_onpolicy_relabel_uses_bestofn_and_surprisal_budget():
 
 def test_onepass_student_conditions_block_on_anchor_and_has_expected_shapes():
     from train_onepass_anchor_student import OnePassAnchorStudent
-    from probe_anchor_horizon import load_teacher
-    teacher = load_teacher()
+    from poc import GPT, GPTConfig
+    teacher = GPT(GPTConfig(
+        block_size=16, vocab_size=17, n_layer=1, n_head=1, n_embd=16,
+        dropout=0.0, bias=True,
+    )).eval()
     model = OnePassAnchorStudent(teacher, rank=2, horizon=3).eval()
     x = torch.randint(0, teacher.config.vocab_size, (2, teacher.config.block_size))
     anchor = torch.tensor([1, 2])
