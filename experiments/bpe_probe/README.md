@@ -1,8 +1,8 @@
 # Natural-language BPE experiments
 
-This directory tests whether the synthetic Anchor Block LM result survives on a small natural-language BPE model.
+This directory tests whether the synthetic Anchor Block LM mechanism survives on a small natural-language BPE model.
 
-The goal is still mechanism validation, not scale.
+The goal is **mechanism validation, not scale or production speed**.
 
 ## Dataset and teacher
 
@@ -11,9 +11,9 @@ The goal is still mechanism validation, not scale.
 - byte-level BPE, vocabulary 1024, trained on the train split only.
 - tiny nanoGPT teacher: 2 layers, 4 heads, width 64, context 64.
 
-The teacher is intentionally small. Its held-out NLL is high, so negative results here should not be generalized to larger LMs.
+The teacher is intentionally small. The positional split also creates noticeable distribution shift between dev and test. Results here should not be generalized to larger LMs without further experiments.
 
-## What we learned so far
+## What we learned
 
 ### 1. Exact rollout-prefix agreement is too strict
 
@@ -24,14 +24,14 @@ At an 80% joint-prefix-mass threshold:
 - direct mean safe length: 0.0156 BPE tokens
 - after one sampled anchor: 0.0547 BPE tokens
 
-The anchor effect is positive, but this label definition is not useful for training.
+The anchor effect is positive, but this label definition is too conservative for training.
 
-### 2. The anchor does contain real information about the next future token
+### 2. The realized anchor carries substantial information about the next future token
 
-A fair same-position probe compares the distribution of (X_{t+2}):
+A fair same-position probe compares the distribution of X_(t+2):
 
-- before observing (X_{t+1}), versus
-- after observing a sampled (X_{t+1}).
+- before observing X_(t+1), versus
+- after observing a sampled X_(t+1).
 
 Across 256 held-out contexts with 32 sampled anchors per context:
 
@@ -41,59 +41,106 @@ Across 256 held-out contexts with 32 sampled anchors per context:
 
 So the premise that an anchor can collapse future uncertainty is present even in this weak BPE teacher.
 
-### 3. A two-backbone-call implementation is not enough
+### 3. A two-backbone-call implementation is structurally wrong for this idea
 
 The first BPE student used:
 
-```text
+~~~text
 AR backbone call -> anchor
 second backbone call -> variable continuation block
-```
+~~~
 
 The initial teacher-forced student achieved roughly:
 
 - fixed continuation=2: 1.50 tokens/call, 61.9% local teacher agreement
 - variable EOB: 1.33 tokens/call, 62.3% local teacher agreement
 
-An on-policy refresh did not improve the Pareto frontier. It also exposed a structural problem: when the block immediately emits EOB, the second backbone call advances zero tokens, so the method can fall below 1 token/call.
+An on-policy refresh did not improve the Pareto frontier. More importantly, an immediate EOB wastes the second full-model call.
 
-This is why the next implementation is **one-pass anchor-conditioned decoding**.
+This motivated the one-pass design.
 
-## Current architecture under test
+## One-pass architecture
 
-```text
+~~~text
 context
    |
-one backbone forward
+one frozen backbone forward
    |
-   +--> ordinary next-token logits --> anchor
+   +--> exact ordinary next-token logits --> anchor
    |
-   +--> cheap head conditioned on (hidden state, realized anchor)
+   +--> cheap continuation branch
+        conditioned on (hidden state, realized anchor)
             |
             +--> continuation token
             +--> continuation token
             +--> ...
             +--> <EOB>
-```
+~~~
 
-Every backbone call therefore emits at least the ordinary anchor token. If the continuation head immediately stops, generation simply falls back to ordinary autoregressive progress instead of wasting a full backbone call.
+The base AR path is **fully frozen**. A low-rank residual and small heads exist only in the continuation branch. Therefore an immediate EOB is an exact fallback to ordinary AR generation.
 
-The base nanoGPT weights remain frozen; LoRA and the small continuation modules are trainable.
+The EOB head is calibrated after content training using the student's **actual consecutive acceptance length**: how many parallel continuation tokens match the teacher's greedy token under the student-induced prefix.
+
+## Preselected expanded test
+
+The main current result uses:
+
+- 64 held-out test prompts
+- 48 generated BPE tokens per prompt
+- EOB bias **2.0**, frozen from an earlier dev diagnostic
+- random-gating probability **0.132743**, also frozen before this expanded test
+- no tuning on the expanded test
+
+| Method | Tokens / backbone call | Local teacher agreement | Teacher NLL |
+|---|---:|---:|---:|
+| exact AR fallback | 1.000 | **100.00%** | 2.0125 |
+| fixed +1 continuation | 2.000 | 64.29% | 3.1055 |
+| **variable EOB** | **1.103** | **98.11%** | **2.0325** |
+| speed-near random 0/1 gating | 1.128 | 93.33% | 2.1807 |
+
+Variable gating exceeds the random-gating agreement by **+4.79 percentage points**.
+
+Prompt-paired bootstrap, 10,000 resamples:
+
+- mean difference: **+4.79 pp**
+- 95% CI: **+3.65 to +5.89 pp**
+- variable is better on **81.25%** of prompts
+
+The random baseline is slightly faster (1.128 vs. 1.103 tokens/call), so this is not an exact equal-throughput comparison. The result nevertheless rejects the explanation that the gain comes merely from "occasionally emitting a second token at random."
+
+The machine-readable snapshot is in [results/published_onepass_preregistered.json](results/published_onepass_preregistered.json).
+
+### What this result does and does not show
+
+It **does** show, in this small controlled natural-language experiment, that:
+
+1. the AR fallback can remain exactly unchanged;
+2. a learned continuation branch can safely commit extra tokens on a subset of states;
+3. confidence-aware gating preserves teacher behavior much better than random gating at a nearby compression rate.
+
+It **does not** yet show:
+
+- GPU wall-clock speedup,
+- exact preservation of the teacher sampling distribution,
+- performance on a strong or large language model,
+- robustness across independent training seeds.
+
+The next required check is multi-seed replication.
 
 ## Why top-p is still useful
 
-The experiments separate two roles that were conflated initially:
+The experiments separate two roles:
 
-1. **content target** — a canonical continuation to imitate;
-2. **uncertainty / horizon estimate** — how far it is safe to compress.
+1. **content target** — what continuation to imitate;
+2. **uncertainty / horizon estimate** — how far to compress.
 
-Best-of-N top-p samples are useful for exploring the teacher's continuation distribution, but forcing a sampled block target while evaluating against the teacher's greedy mode creates an avoidable objective mismatch.
+Best-of-N top-p samples are useful for probing the teacher's future distribution, but forcing a sampled block target while evaluating against the teacher's greedy mode creates an avoidable objective mismatch.
 
-The current one-pass experiment therefore uses teacher-greedy content targets first, while the top-p probes remain the uncertainty diagnostics. If the mechanism works, top-p will be reintroduced as data augmentation and horizon calibration.
+The current one-pass experiment therefore uses teacher-greedy content targets first. Top-p remains useful for uncertainty diagnostics and future distribution-aware calibration.
 
-## Run the probes
+## Reproduce
 
-```bash
+~~~bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -102,29 +149,33 @@ pip install -r requirements.txt
 python prepare_data.py
 python train_teacher.py --steps 1000
 
+python train_onepass_anchor_student.py prepare
+python train_onepass_anchor_student.py train --steps 1200
+
+python calibrate_onepass_eob.py prepare
+python calibrate_onepass_eob.py train --steps 500
+
+python benchmark_onepass_preregistered.py --test-prompts 64 --count 48
+~~~
+
+The uncertainty probes remain available:
+
+~~~bash
 python probe_anchor_horizon.py --contexts 256 --rollouts 16 --horizon 6
 python probe_bestofn_blocks.py --contexts 256 --rollouts 16 --horizon 6
 python probe_anchor_information.py --contexts 256 --anchors-per-context 32
-```
-
-## Run the one-pass student
-
-```bash
-python train_onepass_anchor_student.py prepare
-python train_onepass_anchor_student.py train --steps 1200
-python benchmark_onepass_anchor.py --dev-prompts 64 --test-prompts 128 --count 64
-```
+~~~
 
 Quick tests:
 
-```bash
+~~~bash
 PYTHONPATH=. pytest -q
-```
+~~~
 
-## Interpretation
+## Current interpretation
 
-The current evidence supports a narrow statement:
+The strongest supported statement is intentionally narrow:
 
-> observing one realized autoregressive token substantially reduces uncertainty about the following token, but exploiting that information efficiently requires the continuation predictor to be integrated into the same backbone pass rather than invoked as a second full-model step.
+> a realized autoregressive anchor token reduces uncertainty about its continuation, and a separately calibrated one-pass continuation branch can exploit part of that reduction while retaining an exact AR fallback.
 
-The one-pass experiment tests the second half of that statement.
+The remaining question is how much this effect survives stronger teachers, additional datasets, independent seeds, and real inference systems.
