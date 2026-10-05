@@ -125,7 +125,27 @@ It **does not** yet show:
 - performance on a strong or large language model,
 - robustness across independent training seeds.
 
-The next required check is multi-seed replication.
+### Three independent training seeds
+
+The same preselected benchmark was repeated with three independently trained teacher/student/calibration seeds.
+
+| Metric | Mean ± sample std |
+|---|---:|
+| variable tokens / backbone call | **1.084 ± 0.032** |
+| variable teacher agreement | **98.81% ± 0.47%** |
+| random-gating teacher agreement | 93.83% ± 0.82% |
+| variable - random agreement | **+4.98 ± 1.02 pp** |
+
+Across the three runs:
+
+- exact AR fallback: **3/3**
+- variable gating beat random gating in teacher agreement: **3/3**
+- variable speed range: **1.064 to 1.122 tokens/backbone-call**
+- variable agreement range: **98.31% to 99.25%**
+
+The machine-readable summary is in [results/published_multiseed_summary.json](results/published_multiseed_summary.json).
+
+This reduces the likelihood that the result is specific to one lucky checkpoint, but three seeds on one small corpus are still not a substitute for broader model/data validation.
 
 ## Why top-p is still useful
 
