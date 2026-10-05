@@ -1,0 +1,36 @@
+{
+  "source_run": "https://github.com/Unjuno/anchor-block-lm/actions/runs/37298187813",
+  "conditions": {
+    "test_prompts": 32,
+    "generated_tokens_per_prompt": 32,
+    "dataset": "Romeo and Juliet, byte-level BPE, positional held-out test",
+    "model": "nanoGPT 2 layers / 4 heads / width 64 / context 64",
+    "ar_path": "fully frozen",
+    "eob_calibration": "actual student acceptance under teacher greedy",
+    "note": "preliminary diagnostic; expanded preselected test is run separately"
+  },
+  "ar": {
+    "tokens_per_backbone_call": 1,
+    "local_teacher_agreement": 1
+  },
+  "variable_eob": {
+    "selected_bias": 2,
+    "tokens_per_backbone_call": 1.1094257854821234,
+    "local_teacher_agreement": 0.9765625,
+    "local_teacher_nll": 2.091136638674925
+  },
+  "random01_speed_matched": {
+    "p_one": 0.1327433628318584,
+    "tokens_per_backbone_call": 1.1277533039647578,
+    "local_teacher_agreement": 0.931640625,
+    "local_teacher_nll": 2.1953659936716576
+  },
+  "paired_variable_minus_random_agreement": {
+    "mean_difference": 0.044921875,
+    "ci95": [
+      0.0234375,
+      0.06447753906249964
+    ],
+    "fraction_positive_prompts": 0.75
+  }
+}
