@@ -56,3 +56,27 @@ def test_anchor_information_is_mutual_information_of_mixture():
     assert stats["mixture_entropy_nats"][0].item() == pytest.approx(0.693147, rel=1e-5)
     assert stats["conditional_entropy_nats"][0].item() == pytest.approx(0.0)
     assert stats["conditional_top1_gain"][0].item() == pytest.approx(0.5)
+
+
+def test_bestofn_selects_highest_sequence_log_probability():
+    from train_block_student import select_best_of_n
+    tokens = torch.tensor([[
+        [1, 2, 3],
+        [4, 5, 6],
+    ]])
+    log_probs = torch.tensor([[
+        [-1.0, -1.0, -1.0],
+        [-0.2, -0.2, -0.2],
+    ]])
+    best_tokens, best_log_probs = select_best_of_n(tokens, log_probs)
+    assert best_tokens.tolist() == [[4, 5, 6]]
+    assert best_log_probs.tolist() == [[-0.2, -0.2, -0.2]]
+
+
+def test_surprisal_budget_stops_at_first_running_mean_failure():
+    from train_block_student import target_lengths_from_log_probs
+    log_probs = torch.tensor([
+        [-1.0, -2.0, -6.0, -0.1],
+        [-3.0, -0.1, -0.1, -0.1],
+    ])
+    assert target_lengths_from_log_probs(log_probs, 2.0).tolist() == [2, 0]
