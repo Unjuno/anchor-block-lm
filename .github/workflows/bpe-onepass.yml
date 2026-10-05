@@ -32,7 +32,7 @@ jobs:
       - run: python train_teacher.py --steps 1000
       - run: python train_onepass_anchor_student.py prepare
       - run: python train_onepass_anchor_student.py train --steps 1200
-      - run: python benchmark_onepass_anchor.py --dev-prompts 32 --test-prompts 64 --count 48
+      - run: python benchmark_onepass_anchor.py --dev-prompts 16 --test-prompts 32 --count 32
       - run: cat results/onepass_data_config.json
       - run: cat results/onepass_benchmark.json
       - uses: actions/upload-artifact@v4
