@@ -56,7 +56,7 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 PYTHONPATH=. pytest -q
-./reproduce_synthetic.sh
+bash reproduce_synthetic.sh
 ```
 
 The pipeline trains the teacher, constructs top-p self-distillation targets, trains the anchor-conditioned variable-EOB student, performs an on-policy refresh, and reproduces the published benchmark.
