@@ -27,7 +27,7 @@ jobs:
         run: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
       - run: pip install -r requirements.txt
       - run: PYTHONPATH=. pytest -q
-      - run: python -m py_compile prepare_data.py train_teacher.py probe_anchor_horizon.py
+      - run: python -m py_compile prepare_data.py train_teacher.py probe_anchor_horizon.py probe_bestofn_blocks.py
       - run: python prepare_data.py
       - run: python train_teacher.py --steps 1000
       - run: python probe_anchor_horizon.py --contexts 256 --rollouts 16 --horizon 6
