@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Editors / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Training artifacts
+*.pt
+*.pth
+*.ckpt
+*.bin
+checkpoints/
+out/
+runs/
+wandb/
+
+# Generated data
+data/
+datasets/
+*.npy
+*.npz
+
+# Local experiment outputs
+results/
+logs/
+artifacts/
+
+# Large archives
+*.zip
+*.tar
+*.tar.gz
