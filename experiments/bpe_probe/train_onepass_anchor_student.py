@@ -16,7 +16,7 @@ HERE = Path(__file__).resolve().parent
 SYNTH = HERE.parent / "synthetic"
 sys.path.insert(0, str(SYNTH))
 
-from poc import hidden_states, inject_lora, merge_lora_, sample_contexts, seed_all
+from poc import hidden_states, sample_contexts, seed_all
 from probe_anchor_horizon import load_teacher
 
 HORIZON = 6
@@ -65,18 +65,38 @@ def make_augmented_targets(tokens: torch.Tensor, lengths: torch.Tensor, eob_id: 
     return target
 
 
+class LowRankResidual(nn.Module):
+    """LoRA-style residual used only by the continuation branch.
+
+    The autoregressive backbone and LM head are never modified, so the
+    ordinary next-token path remains bit-identical to the teacher.
+    """
+
+    def __init__(self, width: int, rank: int, alpha: float | None = None):
+        super().__init__()
+        self.rank = rank
+        self.alpha = float(rank if alpha is None else alpha)
+        self.A = nn.Parameter(torch.empty(rank, width))
+        self.B = nn.Parameter(torch.zeros(width, rank))
+        nn.init.kaiming_uniform_(self.A, a=math.sqrt(5))
+
+    def forward(self, x: torch.Tensor):
+        return F.linear(F.linear(x, self.A), self.B) * (self.alpha / self.rank)
+
+
 class OnePassAnchorStudent(nn.Module):
-    """One backbone pass emits a normal anchor and a cheap anchor-conditioned block."""
+    """One backbone pass: exact AR anchor + cheap anchor-conditioned block."""
 
     def __init__(self, teacher, rank: int = RANK, horizon: int = HORIZON):
         super().__init__()
         self.backbone = copy.deepcopy(teacher)
         self.backbone.requires_grad_(False)
-        inject_lora(self.backbone, rank)
         self.rank = rank
         self.horizon = horizon
 
         width = teacher.config.n_embd
+        self.continuation_lora = LowRankResidual(width, rank, alpha=rank)
+
         self.anchor_condition = nn.Sequential(
             nn.Linear(width * 2, width),
             nn.GELU(),
@@ -98,15 +118,22 @@ class OnePassAnchorStudent(nn.Module):
             nn.init.zeros_(head[-1].weight)
             nn.init.zeros_(head[-1].bias)
 
-        self.eob_head = nn.Linear(width, 1)
-        nn.init.zeros_(self.eob_head.weight)
-        nn.init.constant_(self.eob_head.bias, -2.0)
+        # Confidence-aware stop head. It sees each slot state plus token-head
+        # confidence; it cannot alter the AR or token logits themselves.
+        self.eob_head = nn.Sequential(
+            nn.Linear(width + 3, bottleneck),
+            nn.GELU(),
+            nn.Linear(bottleneck, 1),
+        )
+        nn.init.zeros_(self.eob_head[-1].weight)
+        nn.init.constant_(self.eob_head[-1].bias, -2.0)
 
     @property
     def eob_id(self):
         return self.backbone.config.vocab_size
 
     def forward(self, idx: torch.Tensor, anchor_override: torch.Tensor | None = None):
+        # This path is exactly the frozen teacher backbone.
         h = hidden_states(self.backbone, idx)[:, -1]
         anchor_logits = self.backbone.lm_head(h)
 
@@ -116,10 +143,23 @@ class OnePassAnchorStudent(nn.Module):
             anchor = anchor_override
 
         anchor_emb = self.backbone.transformer.wte(anchor)
-        z = h + self.anchor_condition(torch.cat([h, anchor_emb], -1))
+        z = (
+            h
+            + self.continuation_lora(h)
+            + self.anchor_condition(torch.cat([h, anchor_emb], -1))
+        )
         states = torch.stack([z + head(z) for head in self.slot_heads], 1)
         token_logits = self.backbone.lm_head(states)
-        eob_logits = self.eob_head(states)
+
+        probs = token_logits.softmax(-1)
+        top2 = probs.topk(2, dim=-1).values
+        top1 = top2[..., 0]
+        margin = top2[..., 0] - top2[..., 1]
+        entropy = -(probs * probs.clamp_min(1e-9).log()).sum(-1)
+        entropy = entropy / math.log(token_logits.shape[-1])
+        conf = torch.stack([top1, margin, entropy], -1)
+
+        eob_logits = self.eob_head(torch.cat([states, conf], -1))
         block_logits = torch.cat([token_logits, eob_logits], -1)
         return anchor_logits, block_logits
 
@@ -166,6 +206,7 @@ def prepare():
         "eob_rule": "longest prefix whose running mean teacher surprisal <= budget",
         "surprisal_budget_nats": SURPRISAL_BUDGET,
         "horizon": HORIZON,
+        "ar_path": "fully frozen; LoRA-style residual exists only in continuation branch",
         "splits": rows,
     }, indent=2))
 
@@ -223,18 +264,14 @@ def train(steps: int = 1200, seed: int = 8200):
     train_bank = torch.load(HERE / "results" / "onepass_train.pt", weights_only=True)
     dev_bank = torch.load(HERE / "results" / "onepass_dev.pt", weights_only=True)
 
-    lora_params = []
-    head_params = []
-    for name, p in model.named_parameters():
-        if not p.requires_grad:
-            continue
-        if name.endswith(".A") or name.endswith(".B"):
-            lora_params.append(p)
-        else:
-            head_params.append(p)
+    lora_params = list(model.continuation_lora.parameters())
+    head_params = [
+        p for name, p in model.named_parameters()
+        if p.requires_grad and not name.startswith("continuation_lora.")
+    ]
 
     opt = torch.optim.AdamW([
-        {"params": lora_params, "lr": 2e-4, "weight_decay": 0.0},
+        {"params": lora_params, "lr": 3e-4, "weight_decay": 0.0},
         {"params": head_params, "lr": 2e-3, "weight_decay": 1e-3},
     ])
     rng = torch.Generator().manual_seed(seed + 1)
@@ -251,7 +288,7 @@ def train(steps: int = 1200, seed: int = 8200):
 
         anchor_logits, block_logits = model(x, anchor_override=anchor)
 
-        anchor_loss = F.cross_entropy(anchor_logits, anchor)
+        # Anchor logits are a frozen invariant, not an optimization target.
         seq_loss = F.cross_entropy(
             block_logits.flatten(0, 1), target.flatten(), ignore_index=-100
         )
@@ -259,10 +296,10 @@ def train(steps: int = 1200, seed: int = 8200):
             block_logits[:, :HORIZON, :model.eob_id].reshape(-1, model.eob_id),
             tokens.reshape(-1),
         )
-        loss = seq_loss + 0.5 * anchor_loss + 0.25 * aux
+        loss = seq_loss + 0.25 * aux
 
         scale = 0.2 + 0.8 * 0.5 * (1 + math.cos(math.pi * step / steps))
-        opt.param_groups[0]["lr"] = 2e-4 * scale
+        opt.param_groups[0]["lr"] = 3e-4 * scale
         opt.param_groups[1]["lr"] = 2e-3 * scale
 
         opt.zero_grad(set_to_none=True)
@@ -275,9 +312,10 @@ def train(steps: int = 1200, seed: int = 8200):
             row = {"step": step, "loss": loss.item(), **metrics}
             history.append(row)
             print(json.dumps(row), flush=True)
-            score = metrics["block_ce"] + (1.0 - metrics["anchor_accuracy"])
-            if score < best:
-                best = score
+            if metrics["anchor_accuracy"] != 1.0:
+                raise RuntimeError("frozen AR path changed")
+            if metrics["block_ce"] < best:
+                best = metrics["block_ce"]
                 torch.save({
                     "model": model.state_dict(),
                     "rank": RANK,
@@ -291,6 +329,7 @@ def train(steps: int = 1200, seed: int = 8200):
 
 
 def load_student(merged: bool = True):
+    # No backbone LoRA exists in v2; argument retained for benchmark API.
     teacher = load_teacher()
     model = OnePassAnchorStudent(teacher)
     ck = torch.load(
@@ -300,8 +339,6 @@ def load_student(merged: bool = True):
     )
     model.load_state_dict(ck["model"])
     model.eval()
-    if merged:
-        merge_lora_(model)
     return model
 
 
