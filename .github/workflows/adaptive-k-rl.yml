@@ -1,0 +1,59 @@
+name: adaptive-k-rl
+
+on:
+  push:
+    branches: [adaptive-k-rl-policy]
+    paths:
+      - "experiments/adaptive_k_rl/**"
+      - ".github/workflows/adaptive-k-rl.yml"
+      - "experiments/fixed_k_gate/**"
+      - "experiments/bpe_probe/prepare_data.py"
+  workflow_dispatch:
+
+concurrency:
+  group: adaptive-k-rl-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      TOKENIZERS_PARALLELISM: "false"
+    defaults:
+      run:
+        working-directory: experiments/adaptive_k_rl
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install CPU dependencies
+        run: |
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
+          python -m pip install numpy==2.3.5 tokenizers==0.22.2 "pytest>=8"
+      - name: Test adaptive-k invariants
+        run: |
+          PYTHONPATH=. pytest -q tests
+          python -m py_compile adaptive_k.py run_adaptive_k.py run_adaptive_experiment.py
+      - name: Prepare corrected corpus once
+        run: python ../bpe_probe/prepare_data.py --out data --vocab-size 1024
+      - name: Run three adaptive-k seeds
+        run: |
+          for seed in 48017 48018 48019; do
+            python -u run_adaptive_experiment.py \
+              --data data \
+              --out outputs/seed-$seed \
+              --seed $seed
+          done
+      - name: Preserve evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: adaptive-k-rl-evidence
+          path: |
+            experiments/adaptive_k_rl/outputs/
+            experiments/adaptive_k_rl/data/metadata.json
+            experiments/adaptive_k_rl/data/source_manifest.json
+            experiments/adaptive_k_rl/data/tokenizer.json
