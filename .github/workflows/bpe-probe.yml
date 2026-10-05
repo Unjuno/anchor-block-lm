@@ -1,0 +1,38 @@
+name: bpe-predictability-probe
+
+on:
+  push:
+    branches: [bpe-predictability-probe]
+  pull_request:
+    paths:
+      - "experiments/bpe_probe/**"
+      - ".github/workflows/bpe-probe.yml"
+      - "experiments/synthetic/third_party/nanogpt/**"
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: experiments/bpe_probe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install --upgrade pip
+      - name: Install CPU PyTorch
+        run: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
+      - run: pip install -r requirements.txt
+      - run: PYTHONPATH=. pytest -q
+      - run: python -m py_compile prepare_data.py train_teacher.py probe_anchor_horizon.py
+      - run: python prepare_data.py
+      - run: python train_teacher.py --steps 1000
+      - run: python probe_anchor_horizon.py --contexts 256 --rollouts 16 --horizon 6
+      - run: cat results/predictability_probe.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bpe-predictability-probe
+          path: experiments/bpe_probe/results/*.json
