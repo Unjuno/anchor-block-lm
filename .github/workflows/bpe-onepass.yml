@@ -1,0 +1,41 @@
+name: bpe-onepass-anchor-block
+
+on:
+  push:
+    branches: [bpe-predictability-probe]
+    paths:
+      - "experiments/bpe_probe/train_onepass_anchor_student.py"
+      - "experiments/bpe_probe/benchmark_onepass_anchor.py"
+      - "experiments/bpe_probe/tests/test_probe.py"
+      - ".github/workflows/bpe-onepass.yml"
+  workflow_dispatch:
+
+jobs:
+  onepass:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: experiments/bpe_probe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install --upgrade pip
+      - name: Install CPU PyTorch
+        run: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
+      - run: pip install -r requirements.txt
+      - run: PYTHONPATH=. pytest -q
+      - run: python -m py_compile train_onepass_anchor_student.py benchmark_onepass_anchor.py
+      - run: python prepare_data.py
+      - run: python train_teacher.py --steps 1000
+      - run: python train_onepass_anchor_student.py prepare
+      - run: python train_onepass_anchor_student.py train --steps 1200
+      - run: python benchmark_onepass_anchor.py --dev-prompts 64 --test-prompts 128 --count 64
+      - run: cat results/onepass_data_config.json
+      - run: cat results/onepass_benchmark.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bpe-onepass-anchor-block
+          path: experiments/bpe_probe/results/*.json
