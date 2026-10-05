@@ -3,6 +3,18 @@ name: bpe-predictability-probe
 on:
   push:
     branches: [bpe-predictability-probe]
+    paths:
+      - "experiments/bpe_probe/prepare_data.py"
+      - "experiments/bpe_probe/train_teacher.py"
+      - "experiments/bpe_probe/probe_anchor_horizon.py"
+      - "experiments/bpe_probe/probe_bestofn_blocks.py"
+      - "experiments/bpe_probe/probe_anchor_information.py"
+      - "experiments/bpe_probe/train_block_student.py"
+      - "experiments/bpe_probe/benchmark_block_student.py"
+      - "experiments/bpe_probe/onpolicy_block_refresh.py"
+      - "experiments/bpe_probe/benchmark_onpolicy_block.py"
+      - "experiments/bpe_probe/tests/test_probe.py"
+      - ".github/workflows/bpe-probe.yml"
   pull_request:
     paths:
       - "experiments/bpe_probe/**"
