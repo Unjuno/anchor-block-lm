@@ -22,7 +22,7 @@ sys.path.insert(0, str(FIXED_DIR))
 import fixed_k as fk
 import run_experiment as base
 from adaptive_k import MAX_K, commit_lengths
-from run_adaptive_k import prefix_risk_bank, train_gate, summarize_policy, generate
+from run_adaptive_k import prefix_risk_bank, train_gate, summarize_policy, generate, generate_ar
 
 PROTOCOL_VERSION = 'adaptive-k4-categorical-lora-v1'
 
@@ -73,12 +73,36 @@ def online_diagnostic(student, gate, prefixes, seed, count=48, repeats=3):
 
 @torch.no_grad()
 def ar_timing(student, prefixes, seed, count=48, repeats=3):
-    class AlwaysOne(torch.nn.Module):
-        def forward(self, features):
-            logits = torch.full((len(features), MAX_K), -30.0)
-            logits[:, 0] = 30.0
-            return logits
-    return online_diagnostic(student, AlwaysOne(), prefixes, seed, count, repeats)
+    timing = []
+    representative = None
+    for repeat in range(repeats):
+        calls = 0
+        outputs = []
+        start = time.perf_counter()
+        for i in range(len(prefixes)):
+            out, n = generate_ar(
+                student, prefixes[i:i+1], count=count,
+                seed=seed + 1000 * repeat + i,
+            )
+            calls += n
+            outputs.append(out[0])
+        timing.append(time.perf_counter() - start)
+        if representative is None:
+            representative = {
+                'calls': calls,
+                'requested_k_histogram': {'1': calls, '2': 0, '3': 0, '4': 0},
+                'emitted_length_histogram': {'1': calls, '2': 0, '3': 0, '4': 0},
+                'mean_requested_k': 1.0,
+                'tokens_per_backbone_call': len(prefixes) * count / calls,
+                'output_sha256': hashlib.sha256(
+                    torch.stack(outputs).cpu().numpy().tobytes()
+                ).hexdigest(),
+            }
+    representative['generation_seconds_median'] = float(np.median(timing))
+    representative['generation_seconds_range'] = [
+        float(min(timing)), float(max(timing))
+    ]
+    return representative
 
 
 def run(args):
