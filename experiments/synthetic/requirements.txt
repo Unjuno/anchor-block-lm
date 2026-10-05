@@ -1,0 +1,4 @@
+# Tested in Python 3.13.5 on a CPU-only PyTorch build.
+torch==2.10.0
+numpy==2.3.5
+pytest>=8
