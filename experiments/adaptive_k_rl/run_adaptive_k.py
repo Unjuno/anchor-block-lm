@@ -127,3 +127,22 @@ def summarize_policy(bank, gate, penalty: float):
         'mean_reward': float(selected_reward.mean()),
         'mean_uncertainty_by_k': by_k,
     }
+
+
+@torch.no_grad()
+def generate_ar(student, prefix: torch.Tensor, count: int, seed: int):
+    if count < 0:
+        raise ValueError('count must be nonnegative')
+    g = torch.Generator().manual_seed(seed)
+    out = prefix.clone()
+    calls = 0
+    while out.shape[1] - prefix.shape[1] < count:
+        _, anchor_logits = student.encode(
+            out[:, -student.backbone.config.block_size:]
+        )
+        anchor = torch.multinomial(
+            teacher_probs(anchor_logits), 1, generator=g
+        ).squeeze(-1)
+        out = torch.cat([out, anchor[:, None]], 1)
+        calls += 1
+    return out[:, -count:], calls
