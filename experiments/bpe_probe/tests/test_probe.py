@@ -149,3 +149,37 @@ def test_onepass_fixed_k_emits_anchor_plus_k_continuations():
     block_logits[0, 1, 2] = 5.0
     emitted = decode_macro_fixed(anchor_logits, block_logits, eob_id=vocab, k=2)
     assert emitted.tolist() == [3, 1, 2]
+
+
+def test_onepass_anchor_path_is_exactly_frozen_teacher():
+    from train_onepass_anchor_student import OnePassAnchorStudent
+    from poc import GPT, GPTConfig
+    teacher = GPT(GPTConfig(
+        block_size=16, vocab_size=17, n_layer=1, n_head=1, n_embd=16,
+        dropout=0.0, bias=True,
+    )).eval()
+    student = OnePassAnchorStudent(teacher, rank=2, horizon=3).eval()
+    x = torch.randint(0, 17, (3, 16))
+    expected = teacher(x)[0][:, -1]
+    actual, _ = student(x)
+    torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+    # Continuation parameters may change, but the AR path must remain identical.
+    with torch.no_grad():
+        for name, p in student.named_parameters():
+            if p.requires_grad:
+                p.add_(torch.randn_like(p) * 0.1)
+    actual2, _ = student(x)
+    torch.testing.assert_close(actual2, expected, rtol=0, atol=0)
+
+
+def test_consecutive_acceptance_length_stops_on_first_student_error():
+    from calibrate_onepass_eob import consecutive_acceptance_lengths
+    predicted = torch.tensor([
+        [1, 2, 9, 4],
+        [5, 6, 7, 8],
+    ])
+    teacher_greedy = torch.tensor([
+        [1, 2, 3, 4],
+        [0, 6, 7, 8],
+    ])
+    assert consecutive_acceptance_lengths(predicted, teacher_greedy).tolist() == [2, 0]
