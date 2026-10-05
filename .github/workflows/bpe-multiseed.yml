@@ -1,0 +1,68 @@
+name: bpe-onepass-multiseed
+
+on:
+  push:
+    branches: [bpe-multiseed]
+    paths:
+      - "experiments/bpe_probe/train_onepass_anchor_student.py"
+      - "experiments/bpe_probe/calibrate_onepass_eob.py"
+      - "experiments/bpe_probe/benchmark_onepass_preregistered.py"
+      - "experiments/bpe_probe/aggregate_multiseed.py"
+      - ".github/workflows/bpe-multiseed.yml"
+  workflow_dispatch:
+
+jobs:
+  seed:
+    strategy:
+      fail-fast: false
+      matrix:
+        seed_index: [0, 1, 2]
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    defaults:
+      run:
+        working-directory: experiments/bpe_probe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install --upgrade pip
+      - name: Install CPU PyTorch
+        run: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
+      - run: pip install -r requirements.txt
+      - run: PYTHONPATH=. pytest -q
+      - run: python prepare_data.py
+      - name: Train independent teacher seed
+        run: python train_teacher.py --steps 1000 --seed $((42 + ${{ matrix.seed_index }}))
+      - run: python train_onepass_anchor_student.py prepare
+      - name: Train one-pass student seed
+        run: python train_onepass_anchor_student.py train --steps 1200 --seed $((8200 + ${{ matrix.seed_index }}))
+      - run: python calibrate_onepass_eob.py prepare
+      - name: Calibrate EOB seed
+        run: python calibrate_onepass_eob.py train --steps 500 --seed $((10200 + ${{ matrix.seed_index }}))
+      - run: python benchmark_onepass_preregistered.py --test-prompts 64 --count 48
+      - uses: actions/upload-artifact@v4
+        with:
+          name: multiseed-${{ matrix.seed_index }}
+          path: experiments/bpe_probe/results/onepass_preregistered_benchmark.json
+
+  aggregate:
+    needs: seed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install numpy==2.3.5
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: multiseed-*
+          path: multiseed-results
+      - run: python experiments/bpe_probe/aggregate_multiseed.py --root multiseed-results --out multiseed-summary.json
+      - run: cat multiseed-summary.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: multiseed-summary
+          path: multiseed-summary.json
