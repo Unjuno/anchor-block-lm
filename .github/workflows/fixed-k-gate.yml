@@ -1,0 +1,59 @@
+name: fixed-k-binary-lora-gate
+
+on:
+  push:
+    branches: [fixed-k-binary-gate]
+    paths:
+      - 'experiments/fixed_k_gate/**'
+      - '.github/workflows/fixed-k-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fixed-k-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  experiment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      OMP_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+    defaults:
+      run:
+        working-directory: experiments/fixed_k_gate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install CPU dependencies
+        run: |
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
+          python -m pip install numpy==2.3.5 tokenizers==0.22.2 'pytest>=8'
+      - name: Test fixed-K and freeze invariants
+        run: |
+          PYTHONPATH=. pytest -q tests
+          python -m py_compile fixed_k.py run_experiment.py
+      - name: Prepare fresh corrected source and one shared tokenizer
+        run: python ../bpe_probe/prepare_data.py --out data --vocab-size 1024
+      - name: Run three fixed-protocol nanoGPT seeds
+        run: |
+          for seed in 47017 47018 47019; do
+            python -u run_experiment.py --data data --out outputs/seed-$seed --seed $seed
+          done
+      - name: Preserve measurements and checkpoints
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fixed-k-gate-evidence
+          path: |
+            experiments/fixed_k_gate/outputs/
+            experiments/fixed_k_gate/data/metadata.json
+            experiments/fixed_k_gate/data/source_manifest.json
+            experiments/fixed_k_gate/data/tokenizer.json
+          if-no-files-found: warn
