@@ -15,11 +15,6 @@ on:
       - "experiments/bpe_probe/benchmark_onpolicy_block.py"
       - "experiments/bpe_probe/tests/test_probe.py"
       - ".github/workflows/bpe-probe.yml"
-  pull_request:
-    paths:
-      - "experiments/bpe_probe/**"
-      - ".github/workflows/bpe-probe.yml"
-      - "experiments/synthetic/third_party/nanogpt/**"
   workflow_dispatch:
 
 jobs:
