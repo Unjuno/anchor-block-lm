@@ -346,11 +346,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("stage", choices=["prepare", "train"])
     ap.add_argument("--steps", type=int, default=1200)
+    ap.add_argument("--seed", type=int, default=8200)
     args = ap.parse_args()
     if args.stage == "prepare":
         prepare()
     else:
-        train(args.steps)
+        train(args.steps, args.seed)
 
 
 if __name__ == "__main__":
