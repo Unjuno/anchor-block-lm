@@ -33,3 +33,12 @@ def test_safe_lengths_stop_at_first_joint_mass_failure():
         [0.79, 0.95, 0.95, 0.95, 0.95],
     ])
     assert safe_lengths(mass, 0.80).tolist() == [3, 0]
+
+
+def test_contiguous_min_probability_length_stops_at_first_weak_token():
+    from probe_bestofn_blocks import contiguous_min_probability_lengths
+    probs = torch.tensor([
+        [0.8, 0.6, 0.19, 0.9],
+        [0.1, 0.9, 0.9, 0.9],
+    ])
+    assert contiguous_min_probability_lengths(probs, 0.2).tolist() == [2, 0]
