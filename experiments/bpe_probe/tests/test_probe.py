@@ -96,3 +96,18 @@ def test_decode_variable_block_stops_at_eob_and_fixed_ignores_it():
     assert tokens[:2].tolist() == [1, 2]
     fixed = decode_fixed(logits, eob, k=3)
     assert fixed.tolist() == [1, 2, 0]
+
+
+def test_onpolicy_relabel_uses_bestofn_and_surprisal_budget():
+    from onpolicy_block_refresh import targets_from_rollouts
+    tokens = torch.tensor([[
+        [1, 2, 3],
+        [4, 5, 6],
+    ]])
+    log_probs = torch.tensor([[
+        [-1.0, -1.0, -6.0],
+        [-0.2, -0.2, -5.0],
+    ]])
+    best_tokens, lengths = targets_from_rollouts(tokens, log_probs, max_mean_surprisal=1.0)
+    assert best_tokens.tolist() == [[4, 5, 6]]
+    assert lengths.tolist() == [2]
