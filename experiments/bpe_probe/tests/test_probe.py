@@ -70,7 +70,7 @@ def test_bestofn_selects_highest_sequence_log_probability():
     ]])
     best_tokens, best_log_probs = select_best_of_n(tokens, log_probs)
     assert best_tokens.tolist() == [[4, 5, 6]]
-    assert best_log_probs.tolist() == [[-0.2, -0.2, -0.2]]
+    torch.testing.assert_close(best_log_probs, torch.full((1, 3), -0.2))
 
 
 def test_surprisal_budget_stops_at_first_running_mean_failure():
