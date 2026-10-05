@@ -1,166 +1,68 @@
 # Anchor Block LM
 
-A research prototype for **adaptive language-model decoding**:
+A nanoGPT-scale research prototype: emit an ordinary autoregressive anchor, then predict a variable-length continuation from the same backbone state.
 
-> keep the ordinary autoregressive token as an exact anchor, then use the same backbone state to emit a calibrated variable-length continuation block.
+> **Data-integrity correction — 2026-10-05:** the historical BPE preprocessing did not recognize the source's Gutenberg boundary markers. Headers and publisher/license material were retained. The archived BPE measurements are not validated body-only results. Clean-corpus retraining and an equal-budget comparison remain outstanding. See [the audit](docs/RESULTS_AUDIT.md).
 
-The working hypothesis is that full autoregressive decoding is most valuable at uncertain branching points. Once one token is realized, some following tokens become easier to predict and can sometimes be committed without another full backbone step.
+## Mechanism
 
-## One-pass design
+```text
+context -> one frozen backbone pass -> ordinary greedy anchor
+                                    -> anchor-conditioned continuation heads
+                                       -> zero or more tokens -> <EOB>
+```
 
-~~~text
-context
-   |
-one frozen backbone forward
-   |
-   +--> exact ordinary next-token logits --> anchor
-   |
-   +--> lightweight continuation branch
-        conditioned on (hidden state, realized anchor)
-            |
-            +--> continuation token
-            +--> continuation token
-            +--> ...
-            +--> <EOB>
-~~~
+The current one-pass model freezes the backbone and ordinary next-token head. A low-rank residual **and small trainable dense heads** live in the continuation branch; this is not a claim that every trainable parameter is LoRA. The EOB head is trained separately against the student's consecutive agreement with the frozen teacher on training/calibration contexts.
 
-The autoregressive backbone and next-token path are fully frozen. Trainable low-rank updates exist only in the continuation branch. If the continuation branch stops immediately, the model reduces exactly to ordinary AR decoding for that step.
+The teacher is used to construct training labels and evaluate outputs, not to verify each block during deployment. Immediate EOB retains the ordinary greedy anchor. Exact fallback tests apply to evaluation mode with the tested numerical backend; they are not a guarantee of bitwise identity across hardware or sampling-distribution preservation.
 
-This is intentionally different from a two-model draft-and-verify loop: inference does not call a separate teacher to verify each block.
+## Evidence status
 
-## Current evidence
+| Evidence | Current interpretation |
+|---|---|
+| [Synthetic experiment](experiments/synthetic) | Separate controlled character-level proof of concept; not natural-language quality evidence. |
+| [Historical BPE snapshots](experiments/bpe_probe/results) | Preserved unchanged for auditability; body-only interpretation withdrawn. |
+| Three historical BPE training seeds | Repeat the same preprocessing and comparison limitations; repetition does not remove those limitations. |
+| Corrected preprocessing | Boundary, cache, provenance and workflow regressions added. No corrected-corpus training results are released by this patch. |
 
-### Synthetic mechanism test
+Local teacher agreement measures whether each generated token equals the teacher's greedy choice **given that method's generated prefix**. It is not task accuracy, human-rated quality, or exact agreement with one independently generated teacher sequence. Teacher-produced anchors are included in the aggregate, so continuation-only metrics are also needed.
 
-The original character-level controlled experiment showed that a variable EOB policy can outperform a fixed continuation length at a similar backbone-call compression rate.
+Tokens per backbone call is a count-based metric, **not wall-clock speed**. Head computation, context processing, cache behavior and runtime overhead must be measured separately. The historical random comparator emitted more tokens per call than the adaptive policy; its agreement difference does not establish superiority at equal compute.
 
-See [experiments/synthetic](experiments/synthetic).
+## Scope and next experiment
 
-### Natural-language BPE test
+Stay with the existing tiny nanoGPT: 2 layers, 4 attention heads, width 64, context 64. No large-model experiment is required.
 
-A small byte-level-BPE nanoGPT experiment on *Romeo and Juliet* now reproduces the mechanism.
+The next meaningful experiment is clean-corpus retraining with a fixed tokenizer/source manifest, fresh held-out contexts and predeclared quality criteria, followed by an equal-call-budget random-gating control. Preserve per-prompt outputs and separate anchor from continuation errors. The scripts named `preregistered` are retained for compatibility but are historical fixed-policy diagnostics, not an independently preregistered confirmation.
 
-The current preselected expanded test uses 64 held-out prompts × 48 generated BPE tokens. The EOB bias and random-gating probability were fixed before this expanded test.
+## Run tests
 
-| Method | Tokens / backbone call | Local teacher agreement |
-|---|---:|---:|
-| exact AR fallback | 1.000 | **100.00%** |
-| fixed +1 continuation | 2.000 | 64.29% |
-| **variable EOB** | **1.103** | **98.11%** |
-| nearby-rate random 0/1 gating | 1.128 | 93.33% |
-
-Variable gating improves prompt-paired teacher agreement over random gating by **+4.79 percentage points**, bootstrap 95% CI **+3.65 to +5.89 pp**.
-
-Three independent teacher/student/calibration seeds also reproduce the effect:
-
-| Metric | Mean ± sample std |
-|---|---:|
-| variable tokens / backbone call | **1.084 ± 0.032** |
-| variable teacher agreement | **98.81% ± 0.47%** |
-| random-gating teacher agreement | 93.83% ± 0.82% |
-| variable - random agreement | **+4.98 ± 1.02 pp** |
-
-Across all three seeds, the AR fallback remained exactly teacher-equivalent and variable gating beat random gating in teacher agreement.
-
-See [experiments/bpe_probe](experiments/bpe_probe) for the full experiment history, failed variants, uncertainty probes, and reproduction commands.
-
-## Important limitations
-
-These results are **not** a production LLM speed benchmark.
-
-They currently establish only an algorithmic mechanism:
-
-- backbone-call count is reduced on a subset of states;
-- the exact AR fallback is preserved;
-- adaptive gating is better than random gating at a nearby compression rate.
-
-They do **not** yet establish:
-
-- GPU wall-clock speedup,
-- exact preservation of the teacher sampling distribution,
-- results on strong or large language models,
-- cross-dataset generalization,
-- optimized KV-cache behavior or kernels.
-
-The natural-language teacher is deliberately tiny and the current corpus split has measurable distribution shift.
-
-## Why an anchor helps
-
-A same-position information probe asks how much knowing the realized token X_(t+1) changes uncertainty about X_(t+2).
-
-On 256 held-out BPE contexts with 32 sampled anchors per context:
-
-- conditional mutual information: **1.083 nats / 1.562 bits**
-- teacher top-1 probability: **13.8% -> 24.6%**
-- positive information gain in **99.6%** of contexts
-
-This does not by itself imply that long blocks are easy, but it validates the central premise that the realized anchor contains useful information about the immediate future.
-
-## Self-distillation
-
-The current training path separates two problems:
-
-1. **continuation content** — learn future token heads from the frozen AR teacher;
-2. **commit horizon** — calibrate EOB from the student's actual consecutive agreement with the teacher under student-induced prefixes.
-
-Top-p sampling is retained as an uncertainty probe and future source of distribution-aware training signals. Earlier experiments that directly used strict top-p rollout-prefix agreement were too conservative on natural language; those negative results are kept in the repository.
-
-## Reproduce
-
-Synthetic experiment:
-
-~~~bash
-cd experiments/synthetic
+```bash
+cd experiments/bpe_probe
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-PYTHONPATH=. pytest -q
-bash reproduce_synthetic.sh
-~~~
+python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
+python -m pip install -r requirements.txt
+PYTHONPATH=. python -m pytest -q
+```
 
-Natural-language BPE experiment:
+## Prepare corrected data
 
-~~~bash
+Use a **fresh checkout/data directory**; do not reuse old tokenizers, banks or checkpoints. The default is Project Gutenberg edition 1513, not the historical mirrored edition 1112. Original source bytes and their notices are retained locally in `source.txt`.
+
+```bash
 cd experiments/bpe_probe
 python prepare_data.py
-python train_teacher.py --steps 1000
+```
 
-python train_onepass_anchor_student.py prepare
-python train_onepass_anchor_student.py train --steps 1200
+The source URL is not immutable. Metadata records raw-byte, cleaned-body, tokenizer and split hashes. To enforce a known source snapshot, supply `--expected-source-sha256` with its recorded digest. Cross-version deterministic tokenization is not claimed merely because hashes are recorded.
 
-python calibrate_onepass_eob.py prepare
-python calibrate_onepass_eob.py train --steps 500
+See [BPE setup and limitations](experiments/bpe_probe) before running the training scripts. Existing numerical snapshots must not be presented as measurements produced by this corrected pipeline.
 
-python benchmark_onepass_preregistered.py --test-prompts 64 --count 48
-~~~
+## Related areas
 
-## Current status
+The project connects multi-token prediction, self-distillation, and selective prediction/optimal stopping. These connections motivate experiments, not a novelty claim or a proof of efficiency.
 
-- [x] Synthetic feasibility experiment
-- [x] Natural-language BPE feasibility experiment
-- [x] Exact frozen AR fallback
-- [x] One-pass anchor-conditioned continuation branch
-- [x] Learned/calibrated variable EOB
-- [x] Nearby-rate random-gating baseline
-- [x] Prompt-paired bootstrap
-- [x] Three independent training seeds
-- [x] CI and regression tests
-- [ ] Better natural-language dataset split / additional corpus
-- [ ] Stronger teacher
-- [ ] KV-cache + GPU benchmark
-- [ ] Kernel-level wall-clock optimization
-- [ ] Larger-model validation
+## Attribution and license
 
-## Relationship to prior work
-
-The project is related to multi-token prediction, blockwise parallel decoding, sequence-level/self-distillation, speculative decoding, adaptive computation, and optimal stopping.
-
-The intended research direction emphasizes an **exact autoregressive anchor path plus a separately trainable, confidence-calibrated continuation branch**.
-
-## Implementation
-
-The first implementation uses a minimal subset of [nanoGPT](https://github.com/karpathy/nanoGPT). The upstream MIT license is preserved under experiments/synthetic/third_party/nanogpt.
-
-## License
-
-MIT License. See [LICENSE](LICENSE).
+The model subset derives from [nanoGPT](https://github.com/karpathy/nanoGPT); its upstream MIT notice is preserved in `experiments/synthetic/third_party/nanogpt/LICENSE`. Repository code is under [MIT](LICENSE). Downloaded corpora retain their own terms and are not relicensed by this repository.

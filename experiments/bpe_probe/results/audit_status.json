@@ -1,0 +1,17 @@
+{
+  "audit_date": "2026-10-05",
+  "status": "historical_body_only_interpretation_withdrawn",
+  "affected_snapshots": [
+    "published_onepass_preliminary.json",
+    "published_onepass_preregistered.json",
+    "published_multiseed_summary.json"
+  ],
+  "source_boundary_bug": "START OF THIS was not recognized; raw wrapper retained",
+  "equal_test_call_budget_established": false,
+  "independent_preregistered_holdout_established": false,
+  "wall_clock_speedup_established": false,
+  "snapshot_values_modified": false,
+  "corrected_preprocessing": "gutenberg-body-v2",
+  "corrected_corpus_training_status": "not_run_in_this_repair",
+  "audit_document": "../../../docs/RESULTS_AUDIT.md"
+}

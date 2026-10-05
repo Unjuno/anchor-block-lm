@@ -7,10 +7,16 @@ on:
       - "experiments/bpe_probe/train_onepass_anchor_student.py"
       - "experiments/bpe_probe/benchmark_onepass_anchor.py"
       - "experiments/bpe_probe/calibrate_onepass_eob.py"
-      - "experiments/bpe_probe/benchmark_onepass_calibrated.py benchmark_onepass_preregistered.py"
-      - "experiments/bpe_probe/tests/test_probe.py"
+      - "experiments/bpe_probe/benchmark_onepass_calibrated.py"
+      - "experiments/bpe_probe/benchmark_onepass_preregistered.py"
+      - "experiments/bpe_probe/prepare_data.py"
+      - "experiments/bpe_probe/tests/**"
       - ".github/workflows/bpe-onepass.yml"
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   onepass:
@@ -29,7 +35,7 @@ jobs:
         run: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
       - run: pip install -r requirements.txt
       - run: PYTHONPATH=. pytest -q
-      - run: python -m py_compile train_onepass_anchor_student.py benchmark_onepass_anchor.py calibrate_onepass_eob.py benchmark_onepass_calibrated.py
+      - run: python -m py_compile train_onepass_anchor_student.py benchmark_onepass_anchor.py calibrate_onepass_eob.py benchmark_onepass_calibrated.py benchmark_onepass_preregistered.py
       - run: python prepare_data.py
       - run: python train_teacher.py --steps 1000
       - run: python train_onepass_anchor_student.py prepare
@@ -41,8 +47,10 @@ jobs:
       - run: cat results/onepass_data_config.json
       - run: cat results/onepass_calibration_config.json
       - run: cat results/onepass_calibrated_benchmark.json
-      - run: cat results/onepass_preregistered_benchmark.json
       - uses: actions/upload-artifact@v4
         with:
           name: bpe-onepass-anchor-block
-          path: experiments/bpe_probe/results/*.json
+          path: |
+            experiments/bpe_probe/results/*.json
+            experiments/bpe_probe/data/metadata.json
+            experiments/bpe_probe/data/source_manifest.json
