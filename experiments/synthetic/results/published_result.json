@@ -1,0 +1,36 @@
+{
+  "conditions": {
+    "prompts": 64,
+    "chars": 64,
+    "test_untouched_by_training": true
+  },
+  "frozen_base_equal": true,
+  "rows": [
+    {
+      "method": "fixed_cont3",
+      "chars_per_call": 2.0,
+      "local_teacher_agreement": 0.821533203125,
+      "local_teacher_nll": 1.3597183227539062,
+      "mean_block_continuation_length": 0.0
+    },
+    {
+      "method": "eob_onpolicy_bias0",
+      "chars_per_call": 1.9692307692307693,
+      "local_teacher_agreement": 0.951171875,
+      "local_teacher_nll": 0.6634340286254883,
+      "mean_block_continuation_length": 2.951597289448209
+    },
+    {
+      "method": "eob_onpolicy_bias2",
+      "chars_per_call": 1.819635717458907,
+      "local_teacher_agreement": 0.966552734375,
+      "local_teacher_nll": 0.5360082387924194,
+      "mean_block_continuation_length": 2.650268336314848
+    }
+  ],
+  "paired_agreement_diff_eob0_minus_fixed3": 0.129638671875,
+  "paired_bootstrap_95ci": [
+    0.104736328125,
+    0.154541015625
+  ]
+}

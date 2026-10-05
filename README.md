@@ -39,14 +39,27 @@ The important distinction from speculative decoding is that the deployed student
 
 Current results are **controlled synthetic character-level experiments**, not a production LLM benchmark.
 
-Using a small nanoGPT model, the on-policy variable-EOB model reached approximately the same block compression ratio as a fixed continuation baseline while staying substantially closer to the teacher:
-
 | Method | Tokens / backbone call | Local teacher agreement |
 |---|---:|---:|
 | Fixed continuation = 3 | 2.00 | 82.15% |
 | Variable EOB + on-policy refresh | 1.97 | **95.12%** |
 
 These numbers are only evidence that the mechanism is learnable in a controlled setting. They do **not** establish production speedups, distribution preservation, or natural-language quality.
+
+## Reproduce the current proof-of-concept
+
+The checked-in synthetic experiment lives in [`experiments/synthetic`](experiments/synthetic).
+
+```bash
+cd experiments/synthetic
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+PYTHONPATH=. pytest -q
+bash reproduce_synthetic.sh
+```
+
+The pipeline trains the teacher, constructs top-p self-distillation targets, trains the anchor-conditioned variable-EOB student, performs an on-policy refresh, and reproduces the published benchmark.
 
 ## Current status
 
@@ -55,6 +68,7 @@ These numbers are only evidence that the mechanism is learnable in a controlled 
 - [x] Anchor-conditioned multi-token continuation
 - [x] Learned `<EOB>` variable block length
 - [x] On-policy self-distillation refresh
+- [x] Checked-in synthetic reproduction code + tests
 - [ ] Natural-language BPE experiment
 - [ ] Multi-seed full training runs
 - [ ] Ablations: anchor / EOB / on-policy refresh
@@ -75,21 +89,13 @@ This repository is intentionally a **research prototype**. The current goal is t
 
 ## Relationship to prior work
 
-The project is related to:
-
-- multi-token prediction,
-- blockwise parallel decoding,
-- sequence-level / on-policy distillation,
-- speculative decoding,
-- adaptive computation and optimal stopping.
+The project is related to multi-token prediction, blockwise parallel decoding, sequence-level / on-policy distillation, speculative decoding, and adaptive computation / optimal stopping.
 
 The intended research direction differs in its emphasis on an **autoregressive anchor followed by a learned variable-length continuation block**.
 
 ## Implementation
 
-The first implementation is based on the design and code structure of [nanoGPT](https://github.com/karpathy/nanoGPT). Attribution for reused or adapted upstream code will be preserved in source files.
-
-Reproduction scripts and cleaned experiment code will be added next.
+The first implementation is based on the design and code structure of [nanoGPT](https://github.com/karpathy/nanoGPT). The experiment vendors only the minimal model subset it needs and preserves the upstream MIT license under `experiments/synthetic/third_party/nanogpt`.
 
 ## License
 
