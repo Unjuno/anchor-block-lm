@@ -6,6 +6,8 @@ on:
     paths:
       - "experiments/bpe_probe/train_onepass_anchor_student.py"
       - "experiments/bpe_probe/benchmark_onepass_anchor.py"
+      - "experiments/bpe_probe/calibrate_onepass_eob.py"
+      - "experiments/bpe_probe/benchmark_onepass_calibrated.py"
       - "experiments/bpe_probe/tests/test_probe.py"
       - ".github/workflows/bpe-onepass.yml"
   workflow_dispatch:
@@ -27,14 +29,17 @@ jobs:
         run: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
       - run: pip install -r requirements.txt
       - run: PYTHONPATH=. pytest -q
-      - run: python -m py_compile train_onepass_anchor_student.py benchmark_onepass_anchor.py
+      - run: python -m py_compile train_onepass_anchor_student.py benchmark_onepass_anchor.py calibrate_onepass_eob.py benchmark_onepass_calibrated.py
       - run: python prepare_data.py
       - run: python train_teacher.py --steps 1000
       - run: python train_onepass_anchor_student.py prepare
       - run: python train_onepass_anchor_student.py train --steps 1200
-      - run: python benchmark_onepass_anchor.py --dev-prompts 16 --test-prompts 32 --count 32
+      - run: python calibrate_onepass_eob.py prepare
+      - run: python calibrate_onepass_eob.py train --steps 500
+      - run: python benchmark_onepass_calibrated.py --dev-prompts 16 --test-prompts 32 --count 32
       - run: cat results/onepass_data_config.json
-      - run: cat results/onepass_benchmark.json
+      - run: cat results/onepass_calibration_config.json
+      - run: cat results/onepass_calibrated_benchmark.json
       - uses: actions/upload-artifact@v4
         with:
           name: bpe-onepass-anchor-block
