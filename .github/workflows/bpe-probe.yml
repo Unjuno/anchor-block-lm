@@ -27,13 +27,15 @@ jobs:
         run: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
       - run: pip install -r requirements.txt
       - run: PYTHONPATH=. pytest -q
-      - run: python -m py_compile prepare_data.py train_teacher.py probe_anchor_horizon.py probe_bestofn_blocks.py
+      - run: python -m py_compile prepare_data.py train_teacher.py probe_anchor_horizon.py probe_bestofn_blocks.py probe_anchor_information.py
       - run: python prepare_data.py
       - run: python train_teacher.py --steps 1000
       - run: python probe_anchor_horizon.py --contexts 256 --rollouts 16 --horizon 6
       - run: python probe_bestofn_blocks.py --contexts 256 --rollouts 16 --horizon 6
+      - run: python probe_anchor_information.py --contexts 256 --anchors-per-context 32
       - run: cat results/predictability_probe.json
       - run: cat results/bestofn_block_probe.json
+      - run: cat results/anchor_information_probe.json
       - uses: actions/upload-artifact@v4
         with:
           name: bpe-predictability-probe
