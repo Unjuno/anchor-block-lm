@@ -19,6 +19,7 @@ Run commands from this directory.
 ```bash
 python train_teacher.py --steps 1600
 python anchor_block_experiment.py prepare
+python anchor_block_experiment.py train-anchor --steps 1800
 python eob_experiment.py prepare
 python eob_experiment.py train --steps 1200
 python onpolicy_eob_refresh.py prepare
