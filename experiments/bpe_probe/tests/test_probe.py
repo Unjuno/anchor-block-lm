@@ -80,3 +80,19 @@ def test_surprisal_budget_stops_at_first_running_mean_failure():
         [-3.0, -0.1, -0.1, -0.1],
     ])
     assert target_lengths_from_log_probs(log_probs, 2.0).tolist() == [2, 0]
+
+
+def test_decode_variable_block_stops_at_eob_and_fixed_ignores_it():
+    from benchmark_block_student import decode_variable, decode_fixed
+    vocab = 5
+    eob = vocab
+    logits = torch.full((1, 4, vocab + 1), -10.0)
+    logits[0, 0, 1] = 5.0
+    logits[0, 1, 2] = 5.0
+    logits[0, 2, eob] = 6.0
+    logits[0, 3, 3] = 5.0
+    tokens, length = decode_variable(logits, eob, max_tokens=3, eob_bias=0.0)
+    assert length == 2
+    assert tokens[:2].tolist() == [1, 2]
+    fixed = decode_fixed(logits, eob, k=3)
+    assert fixed.tolist() == [1, 2, 0]
