@@ -183,3 +183,26 @@ def test_consecutive_acceptance_length_stops_on_first_student_error():
         [0, 6, 7, 8],
     ])
     assert consecutive_acceptance_lengths(predicted, teacher_greedy).tolist() == [2, 0]
+
+
+def test_block_transformer_preserves_exact_anchor_path_and_shapes():
+    from train_block_head_ablation import BlockContentStudent
+    from poc import GPT, GPTConfig
+    teacher = GPT(GPTConfig(
+        block_size=16, vocab_size=17, n_layer=1, n_head=1, n_embd=16,
+        dropout=0.0, bias=True,
+    )).eval()
+    x = torch.randint(0, 17, (2, 16))
+    expected = teacher(x)[0][:, -1]
+    for kind in ("independent", "transformer"):
+        model = BlockContentStudent(teacher, rank=2, horizon=4, head_kind=kind).eval()
+        anchor_logits, block_logits = model(x)
+        torch.testing.assert_close(anchor_logits, expected, rtol=0, atol=0)
+        assert block_logits.shape == (2, 4, 17)
+
+
+def test_acceptance_length_uses_student_induced_prefix():
+    from train_block_head_ablation import consecutive_teacher_acceptance
+    predicted = torch.tensor([[1, 2, 3], [4, 5, 6]])
+    teacher_tokens = torch.tensor([[1, 9, 3], [4, 5, 6]])
+    assert consecutive_teacher_acceptance(predicted, teacher_tokens).tolist() == [1, 3]
