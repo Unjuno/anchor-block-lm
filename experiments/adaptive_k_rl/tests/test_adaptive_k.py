@@ -184,3 +184,22 @@ def test_train_gate_returns_positive_penalty_and_does_not_need_selected_targets(
     gate, penalty = train_gate(bank, steps=20, seed=41)
     assert penalty > 0
     assert gate(torch.randn(3, 6)).shape == (3, 4)
+
+
+def test_pure_ar_generation_never_calls_tail_or_gate_features():
+    from run_adaptive_k import generate_ar
+    teacher = tiny()
+    student = fk.FixedKStudent(
+        teacher, rank=2, components=2
+    ).eval().requires_grad_(False)
+    original_tail = student.tail
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError('pure AR path must not call tail')
+
+    student.tail = forbidden
+    prefix = torch.zeros(1, 16, dtype=torch.long)
+    out, calls = generate_ar(student, prefix, count=8, seed=91)
+    assert out.shape == (1, 8)
+    assert calls == 8
+    student.tail = original_tail
