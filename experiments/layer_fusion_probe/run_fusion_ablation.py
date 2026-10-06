@@ -5,6 +5,7 @@ import copy
 import sys
 from pathlib import Path
 
+import numpy as np
 import torch
 
 HERE = Path(__file__).resolve().parent
@@ -165,3 +166,30 @@ def forward_kl_from_bank(models: dict[str, torch.nn.Module], bank):
         logq = fk.joint_log_prob(w, l, y).reshape(len(contexts), samples)
         result[name] = teacher_logp - logq
     return result
+
+
+def paired_forward_kl_summary(
+    baseline: torch.Tensor,
+    fusion: torch.Tensor,
+    seed: int,
+    bootstrap_samples: int = 4000,
+):
+    if baseline.shape != fusion.shape or baseline.ndim != 2:
+        raise ValueError("Expected matching [contexts,samples] tensors")
+    if bootstrap_samples < 1:
+        raise ValueError("bootstrap_samples must be positive")
+    base_per_context = baseline.double().mean(1).cpu().numpy()
+    fusion_per_context = fusion.double().mean(1).cpu().numpy()
+    diff = fusion_per_context - base_per_context
+    rng = np.random.default_rng(seed)
+    draws = diff[
+        rng.integers(0, len(diff), size=(bootstrap_samples, len(diff)))
+    ].mean(1)
+    return {
+        "baseline_mean_nats_per_tail": float(base_per_context.mean()),
+        "fusion_mean_nats_per_tail": float(fusion_per_context.mean()),
+        "fusion_minus_baseline_mean": float(diff.mean()),
+        "fusion_minus_baseline_95ci": [
+            float(x) for x in np.quantile(draws, [0.025, 0.975])
+        ],
+    }
