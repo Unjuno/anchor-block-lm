@@ -1,0 +1,59 @@
+name: consistent-boundary-ci
+
+on:
+  push:
+    branches: [consistent-dynamic-boundary-rl]
+    paths:
+      - "experiments/dynamic_boundary_rl/**"
+      - ".github/workflows/consistent-boundary-ci.yml"
+  pull_request:
+    paths:
+      - "experiments/dynamic_boundary_rl/consistent_dual.py"
+      - "experiments/dynamic_boundary_rl/run_consistent_dual.py"
+      - "experiments/dynamic_boundary_rl/tests/test_consistent*.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: consistent-boundary-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: |
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
+          python -m pip install numpy==2.3.5 tokenizers==0.22.2 "pytest>=8"
+      - name: Run all six related suites
+        run: |
+          set -euo pipefail
+          : > verification.txt
+          for folder in synthetic bpe_probe fixed_k_gate adaptive_k_rl two_model_rl dynamic_boundary_rl; do
+            echo "SUITE $folder" | tee -a verification.txt
+            (cd experiments/$folder && PYTHONPATH=. pytest -q tests) 2>&1 | tee -a verification.txt
+          done
+          python -m compileall -q experiments
+      - name: Export tracked source including workflows
+        if: always()
+        run: |
+          git archive --format=zip --output=workspace-source.zip HEAD
+          git rev-parse HEAD > source_commit.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: consistent-boundary-source-and-tests
+          path: |
+            workspace-source.zip
+            source_commit.txt
+            verification.txt
