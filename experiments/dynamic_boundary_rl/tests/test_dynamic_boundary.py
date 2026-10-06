@@ -77,7 +77,8 @@ def test_probe_tracks_dynamic_k_histogram_and_selected_teacher_risk():
     row = db.probe_policy(Scripted(), features, risk)
     assert row["k_histogram"] == {"1": 1, "2": 1, "3": 1, "4": 1}
     assert row["mean_k"] == pytest.approx(2.5)
-    assert row["selected_k"] == [1, 2, 3, 4]\n    assert row["mean_selected_teacher_risk"] == pytest.approx((0 + .2 + .2 + 1.2) / 4)
+    assert row["selected_k"] == [1, 2, 3, 4]
+    assert row["mean_selected_teacher_risk"] == pytest.approx((0 + .2 + .2 + 1.2) / 4)
 
 
 def test_round_recollection_changes_state_bank_when_actor_policy_changes():
