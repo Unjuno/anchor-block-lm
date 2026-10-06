@@ -57,6 +57,12 @@ def _save(path: Path, obj):
     path.write_text(json.dumps(obj, indent=2, allow_nan=False) + "\n")
 
 
+def seed_experiment(seed: int):
+    """Seed newly initialized fusion weights as well as all global RNGs."""
+    torch.manual_seed(seed)
+    np.random.seed(seed % (2**32))
+
+
 def run(args):
     if min(
         args.steps,
@@ -70,6 +76,7 @@ def run(args):
     ) < 1:
         raise ValueError("all experiment sizes must be positive")
 
+    seed_experiment(args.seed)
     torch.set_num_threads(1)
     torch.use_deterministic_algorithms(True)
     args.out.mkdir(parents=True, exist_ok=False)
@@ -183,6 +190,7 @@ def run(args):
         "data_preprocessing_version": metadata["preprocessing_version"],
         "protocol": {
             "source_training_run": 37324518978,
+            "fusion_initialization_seed": args.seed,
             "source_student_hash": source_hash,
             "evaluator_hash": teacher_hash,
             "train_split_only_for_updates": True,
