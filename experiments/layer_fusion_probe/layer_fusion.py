@@ -26,8 +26,13 @@ class LayerFusionStudent(fk.FixedKStudent):
         rank: int = 8,
         fusion_hidden: int = 64,
         components: int = 4,
+        base_rank: int | None = None,
     ):
-        super().__init__(teacher, rank=rank, components=components)
+        super().__init__(
+            teacher,
+            rank=rank if base_rank is None else base_rank,
+            components=components,
+        )
         width = teacher.config.n_embd
         self.fusion_rank = rank
         self.layer_down = nn.ModuleList([
