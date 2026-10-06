@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: all-layer-fusion-distill-${{ github.ref }}
+  group: all-layer-fusion-distill-v2-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
