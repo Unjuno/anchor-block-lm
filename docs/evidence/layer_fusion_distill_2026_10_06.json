@@ -1,0 +1,15 @@
+{
+  "experiment": "all-layer-lowrank-fusion-distill-v1",
+  "executed": "2026-10-06",
+  "execution": "local CPU; saved hash-verified nanoGPT checkpoints",
+  "seeds": [
+    {"seed":48017,"initialization_seed":48017,"before_kd":4.365314434893662,"final_layer_kd":4.238552551105386,"all_layer_kd":4.230192448827438,"difference":-0.00836010227794759,"context_bootstrap_95ci":[-0.031300193923379994,0.01241371635187534]},
+    {"seed":48018,"initialization_seed":48018,"before_kd":4.445004643988796,"final_layer_kd":4.334666434908286,"all_layer_kd":4.336833957233466,"difference":0.002167522325180471,"context_bootstrap_95ci":[-0.022783498810895253,0.026136573447729468]},
+    {"seed":48019,"initialization_seed":48019,"before_kd":4.2842841419624165,"final_layer_kd":4.032152717059944,"all_layer_kd":4.0119895957177505,"difference":-0.020163121342193335,"context_bootstrap_95ci":[-0.03417472361470573,-0.0064462758993613445]}
+  ],
+  "metric": "teacher-to-student forward KL in nats per full three-token tail",
+  "protocol": {"steps":600,"batch":64,"lr":0.001,"train_contexts":1536,"teacher_samples_per_train_context":4,"dev_contexts":128,"teacher_samples_per_dev_context":32,"bootstrap_samples":4000,"top_p":1.0,"temperature":1.0,"fusion_rank_per_layer":8,"fusion_mlp_hidden":64,"frozen_backbone_parameters":169728,"control_trainable":30724,"fusion_trainable":36996,"same_data_and_minibatches":true},
+  "decision": {"rule":"all_layer_kd < final_layer_kd in all three seeds","met":false,"new_rl_performed":false,"test_split_evaluated":false,"latency_measured":false,"reward_hacking_determined":false},
+  "verification": {"tests_passed":114,"tests_skipped":0,"compilation_passed":true,"teacher_and_backbone_unchanged":true,"all_layer_projections_updated":true,"anchor_logits_bit_identical_on_checked_dev_inputs":true,"raw_scores_recomputed":true,"explicit_initialization_seed_added":true,"initial_unseeded_pilot_excluded_and_retained":true,"runner_git_blob":"6f9ee689bf60774f8a7acdabf7057edc88e5982b"},
+  "limitations": ["single tiny model family and one play","extra treatment parameters","overlapping dev windows","exploratory dev-set result; no prospective independent test","not full-layer backbone LoRA","no RL or inference speed result in this stage"]
+}
