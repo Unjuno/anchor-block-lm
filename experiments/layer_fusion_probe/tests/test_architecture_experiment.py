@@ -44,3 +44,16 @@ def test_trainable_parameter_count_excludes_frozen_backbone():
     assert exp.trainable_parameter_count(toy) == sum(
         p.numel() for p in toy.trainable.parameters()
     )
+
+
+def test_experiment_seeding_controls_new_fusion_parameter_initialization():
+    import torch
+    import numpy as np
+    import run_architecture_experiment as exp
+    assert hasattr(exp, 'seed_experiment'), 'new fusion weights need explicit reproducible seeding'
+    exp.seed_experiment(48017)
+    a=torch.randn(11); b=np.random.random(4)
+    torch.randn(71); np.random.random(38)
+    exp.seed_experiment(48017)
+    torch.testing.assert_close(torch.randn(11),a,rtol=0,atol=0)
+    np.testing.assert_array_equal(np.random.random(4),b)
