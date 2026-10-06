@@ -1,0 +1,25 @@
+name: fusion-objective-ci
+
+on:
+  push:
+    branches: [fusion-objective-ablation]
+    paths:
+      - "experiments/layer_fusion_probe/**"
+      - ".github/workflows/fusion-objective-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: experiments/layer_fusion_probe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
+      - run: python -m pip install numpy==2.3.5 "pytest>=8"
+      - run: PYTHONPATH=. pytest -q tests
+      - run: python -m py_compile *.py
