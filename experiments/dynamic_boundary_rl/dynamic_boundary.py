@@ -180,6 +180,7 @@ def train_round(
 
     policy_losses = []
     selected_risks = []
+    selected_rewards = []
     for _ in range(policy_steps):
         ix = torch.randint(
             len(states),
@@ -194,14 +195,16 @@ def train_round(
             samples=samples,
         )
         rewards = constrained_rewards(bank["risk"], costs, dual.value)
-        policy_losses.append(
-            policy_step(gate, opt_gate, bank["features"], rewards)
-        )
         with torch.no_grad():
             action = gate(bank["features"]).argmax(-1)
             risk = bank["risk"].gather(-1, action[:, None]).squeeze(-1)
+            chosen_reward = rewards.gather(-1, action[:, None]).squeeze(-1)
             selected_risks.append(risk)
+            selected_rewards.append(chosen_reward)
             dual.update(risk)
+        policy_losses.append(
+            policy_step(gate, opt_gate, bank["features"], rewards)
+        )
 
     with torch.no_grad():
         probe_bank = policy_batch(
@@ -220,6 +223,9 @@ def train_round(
         "policy_loss_mean": float(sum(policy_losses) / len(policy_losses)),
         "training_selected_teacher_risk_mean": float(
             torch.cat(selected_risks).mean()
+        ),
+        "selected_constrained_reward_mean": float(
+            torch.cat(selected_rewards).mean()
         ),
     }
 
