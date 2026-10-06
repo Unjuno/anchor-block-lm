@@ -5,6 +5,7 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import pytest
 import torch
 
 HERE = Path(__file__).resolve().parent
@@ -103,3 +104,22 @@ def test_forward_kl_uses_identical_teacher_samples_for_all_models():
         bank,
     )
     torch.testing.assert_close(scores["source"], scores["fusion"], rtol=0, atol=0)
+
+def test_paired_forward_kl_summary_reports_negative_difference_when_fusion_is_better():
+    runner = load_runner()
+    baseline = torch.tensor([
+        [1.0, 1.2, 0.8],
+        [2.0, 2.2, 1.8],
+        [3.0, 3.2, 2.8],
+    ])
+    fusion = baseline - 0.25
+    summary = runner.paired_forward_kl_summary(
+        baseline,
+        fusion,
+        seed=606,
+        bootstrap_samples=1000,
+    )
+    assert summary["baseline_mean_nats_per_tail"] == pytest.approx(2.0)
+    assert summary["fusion_mean_nats_per_tail"] == pytest.approx(1.75)
+    assert summary["fusion_minus_baseline_mean"] == pytest.approx(-0.25)
+    assert summary["fusion_minus_baseline_95ci"] == pytest.approx([-0.25, -0.25])
