@@ -46,7 +46,7 @@ jobs:
           name: adaptive-k-rl-evidence
           run-id: 37324518978
           github-token: ${{ github.token }}
-          path: saved-evidence
+          path: experiments/layer_fusion_probe/saved-evidence
       - name: Run paired distillation ablation
         run: |
           python -u run_architecture_experiment.py \
