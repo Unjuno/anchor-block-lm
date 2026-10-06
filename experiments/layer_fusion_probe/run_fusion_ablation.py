@@ -38,6 +38,7 @@ def initialize_fusion_from_source(
         rank=rank,
         fusion_hidden=fusion_hidden,
         components=source.components,
+        base_rank=source.low_rank.A.shape[0],
     )
     missing, unexpected = model.load_state_dict(source.state_dict(), strict=False)
     allowed = {
