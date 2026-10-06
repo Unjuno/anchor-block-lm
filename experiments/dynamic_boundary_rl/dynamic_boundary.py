@@ -78,6 +78,7 @@ def probe_policy(gate, features: torch.Tensor, prefix_risks: torch.Tensor):
             str(i): int(k.eq(i).sum()) for i in range(1, prefix_risks.shape[1] + 1)
         },
         "mean_k": float(k.float().mean()),
+        "selected_k": k.detach().cpu().tolist(),
         "mean_selected_teacher_risk": float(selected.mean()),
         "selected_teacher_risk": selected.detach().cpu().tolist(),
     }
