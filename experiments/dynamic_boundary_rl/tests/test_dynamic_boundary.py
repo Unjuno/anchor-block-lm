@@ -141,3 +141,4 @@ def test_alternating_round_updates_content_and_gate_but_never_backbone():
     assert fk.state_hash(gate) != before_gate
     assert set(row["k_histogram"]) == {"1", "2", "3", "4"}
     assert row["dual_lambda"] >= 0
+    assert torch.isfinite(torch.tensor(row["selected_constrained_reward_mean"]))
