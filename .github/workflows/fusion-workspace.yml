@@ -1,0 +1,51 @@
+name: fusion-workspace
+on:
+  push:
+    branches: [all-layer-fusion-distill]
+    paths: [.github/workflows/fusion-workspace.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      OMP_NUM_THREADS: '1'
+      TOKENIZERS_PARALLELISM: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: |
+          pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
+          pip install numpy==2.3.5 tokenizers==0.22.2
+      - uses: actions/download-artifact@v4
+        with:
+          name: adaptive-k-rl-evidence
+          run-id: 37324518978
+          github-token: ${{ github.token }}
+          path: saved-evidence
+      - name: Reconstruct verified splits and bundle tracked source
+        run: |
+          mkdir -p export/code export/data export/wheels
+          git archive HEAD | tar -x -C export/code
+          python - <<'PY'
+          import sys, json, numpy as np
+          from pathlib import Path
+          sys.path.insert(0,'experiments/two_model_rl')
+          from run_two_model import reconstruct_splits
+          data,meta = reconstruct_splits(Path('saved-evidence'),Path('export'))
+          for name,ids in data.items(): np.save(Path('export/data')/(name+'.npy'),ids.numpy().astype(np.uint16))
+          Path('export/data/metadata.json').write_text(json.dumps(meta,indent=2))
+          PY
+          cp saved-evidence/data/tokenizer.json export/data/tokenizer.json
+          git rev-parse HEAD > export/source_commit.txt
+          pip download --no-deps tokenizers==0.22.2 -d export/wheels
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fusion-workspace
+          path: export/
+          if-no-files-found: error
