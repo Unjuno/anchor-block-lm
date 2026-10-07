@@ -6,7 +6,7 @@ A nanoGPT research prototype that learns **where to emit several tokens and wher
 
 **Established:** a frozen AR anchor, trainable continuation branches, and a LoRA length policy can be combined and trained; learned boundaries move. **Not established:** low-degradation wall-clock acceleration, exact sampling-distribution preservation, or faster performance merely by increasing model size.
 
-[Results and claim boundaries](docs/RESULTS.md) · [Theory / 理論整理](docs/THEORY_JA.md) · [Reproduction](docs/REPRODUCIBILITY.md) · [Experiment index](experiments/README.md) · [Research closeout](docs/RESEARCH_CLOSEOUT_JA.md)
+[Results and claim boundaries](docs/RESULTS.md) · [Related work / novelty audit](docs/RELATED_WORK_2026.md) · [Theory / 理論整理](docs/THEORY_JA.md) · [Reproduction](docs/REPRODUCIBILITY.md) · [Experiment index](experiments/README.md) · [Research closeout](docs/RESEARCH_CLOSEOUT_JA.md)
 
 ## The current method
 
@@ -44,6 +44,16 @@ Quality evaluation: 16 dev prompts, four draws, 48 output tokens. Timing: AMD EP
 Final latency is **6.90–8.47% longer** than pure AR in these measurements. The stochastic discrepancy is an augmented token/length-trace reverse-KL estimate: its expectation upper-bounds token-marginal KL; it is not an exact marginal KL or a human quality score. Distribution discrepancy decreased mainly alongside shorter commits. The retained progress/quality development screen passed **0/3** seeds; constraint satisfaction was not statistically established.
 
 Sources: [complete final report](docs/CONSISTENT_DYNAMIC_BOUNDARY_2026_10_07.md), [original numeric summary](docs/evidence/consistent_dynamic_boundary_2026_10_07.json), and [same-timing-trace reanalysis](docs/evidence/final_snapshot_2026_10_07.json).
+
+## Novelty positioning after the 2026 literature audit
+
+A focused primary-source review found substantial overlap with recent work. In particular, **CLP** already combines a backbone-generated first token with a learned span-length predictor and no token-by-token verifier; **AdaMTP** and **EntMTP** adapt prediction/speculation horizon to uncertainty; **LEDE** uses offline RL to choose speculation length in self-speculative decoding; **K-Forcing** and **PTP** address joint multi-token generation; and **MTP-RL** explicitly adapts MTP competence while an RL policy changes.
+
+Accordingly, this repository does **not** claim novelty for "multi-token prediction", "backbone first token", "adaptive extra-token length", "on-policy distillation", or "MTP during RL" in isolation.
+
+The narrower research object explored here is the combination of **full-horizon continuation distillation on all actor-visited contexts + a separate constrained-RL commit-length LoRA + repeated state recollection as continuation competence changes, with no inference-time verifier**. No identical primary paper was found in the audit, but absence from a search is not proof of priority. The project should therefore be described as an open feasibility study of that combination, not as a world-first decoding paradigm.
+
+See [Related work / novelty audit](docs/RELATED_WORK_2026.md) for the comparison matrix and safe public wording.
 
 ## What larger models might change
 

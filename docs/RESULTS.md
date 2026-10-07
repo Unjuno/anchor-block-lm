@@ -14,6 +14,8 @@ Snapshot date: 2026-10-07. This page separates observations, mathematical conseq
 | Reward hacking occurred | Not established | Reference reward increased while risk decreased; shorter commits explain a tradeoff |
 | LoRA-RL is indistinguishable from full-weight RL | Not tested here | Do not infer equivalence from using LoRA |
 | Increasing model size guarantees speedup | False as an unconditional inference | Requires favorable auxiliary/cache cost scaling and maintained quality-feasible block lengths |
+| Backbone-first-token + adaptive extra-token length is novel | **False as a standalone novelty claim** | CLP (arXiv:2606.10935) already combines these elements without token-by-token verification |
+| The exact five-part combination in this repository has established priority | **Not established** | Focused literature audit found no identical primary paper, but search absence is not proof of priority; see RELATED_WORK_2026.md |
 | Small-model feasibility phase may be closed | Scope decision | A reproducible negative-performance result is a valid stopping point; not a successful accelerator claim |
 
 ## Canonical final measurements
@@ -55,4 +57,19 @@ The all-three-seed fusion GO rule was local to that historical architecture prob
 
 ## Novelty and comparison boundaries
 
-This repository is a small-model implementation/feasibility record. It does not establish priority over multi-token prediction, blockwise decoding, on-policy distillation, adaptive computation, or speculative decoding. See [REFERENCES.md](REFERENCES.md). Ordinary AR is the primary performance reference. Earlier random/confidence controls are supporting diagnostics, not the research goal.
+A focused 2026 literature audit materially narrows the novelty language. See [RELATED_WORK_2026.md](RELATED_WORK_2026.md).
+
+The project **cannot** claim novelty for the following components by themselves:
+
+- multi-token / blockwise future prediction;
+- using the original backbone/AR head for the first token;
+- predicting a context-dependent span length;
+- entropy/confidence-adaptive prediction horizons;
+- updating MTP modules while an RL-trained model changes;
+- self/on-policy distillation.
+
+The closest no-verifier inference comparison is **CLP**, which already uses the backbone's own first token plus a learned span-length predictor. **LEDE** also shows that reinforcement learning can dynamically choose speculation length, but within a verified self-speculative system. The closest training-dynamics comparison is **MTP-RL**, which adapts MTP as the main RL policy changes, but uses speculative verification. **AdaMTP** changes the future-token training horizon using entropy masks; **K-Forcing** and **PTP** provide substantially stronger treatments of joint future-token modeling.
+
+The narrower combination explored here is: full-horizon continuation distillation on all actor-visited contexts; a separate constrained-RL commit-length LoRA; state recollection as the continuation actor changes; and direct inference without a target verifier. The audit found no exact primary-source match to all of those properties together, but this is **not** proof of priority, patent novelty, or a first-of-its-kind result.
+
+Accordingly, the strongest defensible public description is an **open small-model feasibility study of verifier-free adaptive commit learning**, not a novel decoding paradigm or state-of-the-art accelerator. Ordinary AR remains the primary performance reference. Stronger future work would need CLP, AdaMTP/EntMTP, K-Forcing/PTP and MTP-RL as explicit comparison points.
