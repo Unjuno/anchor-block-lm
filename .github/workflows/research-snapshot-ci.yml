@@ -1,0 +1,58 @@
+name: research-snapshot-ci
+
+on:
+  push:
+    branches: [main, research-closeout-2026-10-07]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-snapshot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      TOKENIZERS_PARALLELISM: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install CPU test dependencies
+        run: |
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
+          python -m pip install -r requirements-research.txt
+      - name: Check all seven experiment suites and numerical snapshot
+        run: |
+          set -euo pipefail
+          : > verification.txt
+          for folder in synthetic bpe_probe fixed_k_gate adaptive_k_rl two_model_rl dynamic_boundary_rl layer_fusion_probe; do
+            echo "SUITE $folder" | tee -a verification.txt
+            (cd "experiments/$folder" && PYTHONPATH=. python -m pytest -q tests) 2>&1 | tee -a verification.txt
+          done
+          python -m unittest discover -s tests -v 2>&1 | tee -a verification.txt
+          python scripts/verify_snapshot.py 2>&1 | tee -a verification.txt
+          python -m compileall -q experiments scripts tests
+      - name: Export exact source and verification evidence
+        if: always()
+        run: |
+          git archive --format=zip --output=research-snapshot-source.zip HEAD
+          git rev-parse HEAD > source_commit.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: research-snapshot-source-and-verification
+          path: |
+            research-snapshot-source.zip
+            source_commit.txt
+            verification.txt
+          if-no-files-found: error
