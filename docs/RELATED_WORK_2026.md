@@ -37,6 +37,7 @@ In the searched primary literature, no source was found that matches all five pr
 | **K-Forcing** (Tang et al., 2026) | Distills an AR teacher | (k\le k_{train}) can be selected, but default output stride is fixed rather than a learned per-context policy | No learned per-context commit policy in the reported method | Progressive self-forcing distillation (1\to2\to4) | No separate verifier in its direct push-forward mode | Much stronger joint multi-token sampler and batch-serving results; lacks this repository's learned context-conditioned commit policy |
 | **Parallel Token Prediction (PTP)** (Draxler et al., ICLR 2026) | Distills AR behavior | Parallel proposal length / correction structure | Not this repository's commit-policy RL | Distillation can train multi-token sampler | Main reported exact-distribution results use error correction / verification; self-verification also studied | Stronger treatment of stochastic dependencies through explicit auxiliary randomness |
 | **MTP-RL** (Wang et al., Findings ACL 2026) | Main policy/target model verifies drafts | Acceptance length changes through training | Acceptance is produced by speculative verification, not a separate commit policy | **Yes**, MTP is kept policy-aligned during RL | **Yes** | Very close training-dynamics motivation: prevents acceptance collapse while the main RL policy changes, but remains speculative draft-and-verify |
+| **LEDE** (Zhu et al., 2026) | Uses the target model in self-speculative decoding | **Yes**, chooses speculation length per step | **Offline RL** jointly selects exit layer and speculation length | Not the same content-update loop | **Yes**, self-speculative verification | Establishes that RL-based dynamic speculation-length control already exists; differs by verifier use and by optimizing early-exit/speculation configuration rather than direct commit length |
 | **OCC joint MTP-RL** (Chai et al., 2026) | Standard MTP/RL setting | Not a direct length-policy method | No | Joint MTP/RL coefficient is calibrated online | Depends on rollout/inference setup | Addresses optimization interference between RL and MTP, not commit-boundary control |
 | **Medusa / Hydra / EAGLE family** | Target verifies drafts | Accepted length varies | Trees/gates/drafting mechanisms | Usually separate drafting training | **Yes** | Strong speculative-decoding baselines; distribution-preserving or target-verified rather than direct unverified blocks |
 
@@ -50,6 +51,7 @@ The following should not be presented as new contributions:
 - "predict how many extra tokens to accept";
 - "adapt horizon to entropy/confidence";
 - "make MTP follow an RL-updated model";
+- "use reinforcement learning to choose a context-dependent speculation length";
 - "distill from self-generated/on-policy states";
 - "larger models may amortize a lightweight auxiliary module better".
 
@@ -91,6 +93,12 @@ This repository instead uses a learned stochastic length policy and frozen-teach
 
 The experiments here do **not** establish that RL is superior to CLP's simpler supervised predictor. In fact, CLP is an important baseline that would be required in any stronger publication.
 
+## Why LEDE materially overlaps
+
+LEDE formulates self-speculative decoding configuration as a Markov decision process and uses offline reinforcement learning to choose both the exit layer and speculation length from local context. It therefore means that **RL-based dynamic length selection is already prior art**.
+
+The important distinction is narrower: LEDE still operates inside self-speculative draft-and-verify decoding, while this repository's policy directly commits a chosen prefix without an inference-time target verifier, and the continuation branch is separately distilled on actor-visited states. This is a design difference, not a priority claim.
+
 ## Why MTP-RL materially overlaps
 
 MTP-RL identifies "acceptance collapse": if the main RL policy changes while an MTP module stays frozen, the MTP distribution becomes misaligned and speculative acceptance length falls. It therefore co-adapts MTP during RL.
@@ -127,6 +135,7 @@ This is still not an exhaustive priority search. New papers, workshop manuscript
 - Zhiwei Tang et al. **K-Forcing: Joint Next-K-Token Decoding via Push-Forward Language Modeling.** arXiv:2606.10820. https://arxiv.org/abs/2606.10820
 - Felix Draxler et al. **Parallel Token Prediction for Language Models.** ICLR 2026; arXiv:2512.21323. https://arxiv.org/abs/2512.21323
 - Ke Wang et al. **MTP-RL: Acceleration of Reinforcement Learning Rollouts with Policy-Aligned Multi-Token Prediction.** Findings of ACL 2026. https://aclanthology.org/2026.findings-acl.1871/
+- Yanyu Zhu et al. **Experience-Driven Dynamic Exits for LLMs with Reinforcement Learning (LEDE).** arXiv:2606.03113. https://arxiv.org/abs/2606.03113
 - Jiajun Chai et al. **Joint Training of Multi-Token Prediction in Reinforcement Learning via Optimal Coefficient Calibration.** arXiv:2605.28184. https://arxiv.org/abs/2605.28184
 - Tianle Cai et al. **Medusa: Simple LLM Inference Acceleration Framework with Multiple Decoding Heads.** ICML 2024; arXiv:2401.10774. https://arxiv.org/abs/2401.10774
 - Zachary Ankner et al. **Hydra: Sequentially-Dependent Draft Heads for Medusa Decoding.** arXiv:2402.05109. https://arxiv.org/abs/2402.05109
