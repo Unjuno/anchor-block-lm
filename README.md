@@ -1,68 +1,75 @@
 # Anchor Block LM
 
-A nanoGPT-scale research prototype: emit an ordinary autoregressive anchor, then predict a variable-length continuation from the same backbone state.
+**Research snapshot: small-model feasibility study concluded, 2026-10-07.**
 
-> **Data-integrity correction — 2026-10-05:** the historical BPE preprocessing did not recognize the source's Gutenberg boundary markers. Headers and publisher/license material were retained. The archived BPE measurements are not validated body-only results. Clean-corpus retraining and an equal-budget comparison remain outstanding. See [the audit](docs/RESULTS_AUDIT.md).
+A nanoGPT research prototype that learns **where to emit several tokens and where to return to one-token autoregressive generation**. Actual block boundaries can change with both context and training. The maximum prediction horizon is four total tokens; the committed length is not fixed.
 
-## Mechanism
+**Established:** a frozen AR anchor, trainable continuation branches, and a LoRA length policy can be combined and trained; learned boundaries move. **Not established:** low-degradation wall-clock acceleration, exact sampling-distribution preservation, or faster performance merely by increasing model size.
+
+[Results and claim boundaries](docs/RESULTS.md) · [Theory / 理論整理](docs/THEORY_JA.md) · [Reproduction](docs/REPRODUCIBILITY.md) · [Experiment index](experiments/README.md) · [Research closeout](docs/RESEARCH_CLOSEOUT_JA.md)
+
+## The current method
 
 ```text
-context -> one frozen backbone pass -> ordinary greedy anchor
-                                    -> anchor-conditioned continuation heads
-                                       -> zero or more tokens -> <EOB>
+TRAINING
+fixed AR evaluator <--- teacher probabilities on actor-visited states
+                         |
+actor: frozen AR backbone + continuation LoRA + length-policy LoRA
+                         |
+recollect current actor states -> update content -> update length policy
+                         -> reevaluate the same fixed probe contexts
+
+INFERENCE (no evaluator call)
+context -> one backbone pass -> ordinary AR anchor
+                            -> continuation distribution + confidence features
+                            -> learned length policy -> commit 1, 2, 3, or 4 tokens
 ```
 
-The current one-pass model freezes the backbone and ordinary next-token head. A low-rank residual **and small trainable dense heads** live in the continuation branch; this is not a claim that every trainable parameter is LoRA. The EOB head is trained separately against the student's consecutive agreement with the frozen teacher on training/calibration contexts.
+The current continuation content is trained by unfiltered full-horizon teacher-sample distillation. The length policy is trained by contextual-bandit REINFORCE with an adaptive teacher-risk penalty. Both sets of LoRA weights can change; evaluator, original AR weights, and non-LoRA actor weights stay frozen. Confidence is an observation, not a self-awarded reward. The final continuation uses the same categorical policy for learning, state collection, and expected-risk constraint updates. Argmax deployment is reported separately.
 
-The teacher is used to construct training labels and evaluate outputs, not to verify each block during deployment. Immediate EOB retains the ordinary greedy anchor. Exact fallback tests apply to evaluation mode with the tested numerical backend; they are not a guarantee of bitwise identity across hardware or sampling-distribution preservation.
+An exact AR anchor means the **same next-token conditional distribution at the same input context**, not that an entire generated sequence remains identical after approximate blocks have been committed. An immediate one-token decision still incurs actor overhead unless the extra branch is explicitly bypassed.
 
-## Evidence status
+## Final small-model results
 
-| Evidence | Current interpretation |
-|---|---|
-| [Synthetic experiment](experiments/synthetic) | Separate controlled character-level proof of concept; not natural-language quality evidence. |
-| [Historical BPE snapshots](experiments/bpe_probe/results) | Preserved unchanged for auditability; body-only interpretation withdrawn. |
-| Three historical BPE training seeds | Repeat the same preprocessing and comparison limitations; repetition does not remove those limitations. |
-| Corrected preprocessing | Boundary, cache, provenance and workflow regressions added. No corrected-corpus training results are released by this patch. |
+Three archived teacher/student seeds; tiny two-layer, width-64 nanoGPT; one corrected Gutenberg-body BPE corpus. These are development results, not an untouched confirmatory test.
 
-Local teacher agreement measures whether each generated token equals the teacher's greedy choice **given that method's generated prefix**. It is not task accuracy, human-rated quality, or exact agreement with one independently generated teacher sequence. Teacher-produced anchors are included in the aggregate, so continuation-only metrics are also needed.
+| Seed | Generated tokens / backbone call, before → after | Trace-distribution discrepancy, before → after (nat/token) | Final speed / pure AR |
+|---|---:|---:|---:|
+| 48017 | 1.780 → 1.541 | 0.507 → 0.331 | 0.935 |
+| 48018 | 1.527 → 1.499 | 0.282 → 0.261 | 0.935 |
+| 48019 | 1.598 → 1.486 | 0.416 → 0.341 | 0.922 |
 
-Tokens per backbone call is a count-based metric, **not wall-clock speed**. Head computation, context processing, cache behavior and runtime overhead must be measured separately. The historical random comparator emitted more tokens per call than the adaptive policy; its agreement difference does not establish superiority at equal compute.
+Quality evaluation: 16 dev prompts, four draws, 48 output tokens. Timing: AMD EPYC 9V74, CPU one thread, FP32, batch 1, no KV cache, unpinned clock; eight prompts × 48 tokens; five repeats, medians, excluded warmup and evaluator replay. Timed trajectories differ from the larger quality sample: do not combine their call counts when inferring overhead.
 
-## Scope and next experiment
+Final latency is **6.90–8.47% longer** than pure AR in these measurements. The stochastic discrepancy is an augmented token/length-trace reverse-KL estimate: its expectation upper-bounds token-marginal KL; it is not an exact marginal KL or a human quality score. Distribution discrepancy decreased mainly alongside shorter commits. The retained progress/quality development screen passed **0/3** seeds; constraint satisfaction was not statistically established.
 
-Stay with the existing tiny nanoGPT: 2 layers, 4 attention heads, width 64, context 64. No large-model experiment is required.
+Sources: [complete final report](docs/CONSISTENT_DYNAMIC_BOUNDARY_2026_10_07.md), [original numeric summary](docs/evidence/consistent_dynamic_boundary_2026_10_07.json), and [same-timing-trace reanalysis](docs/evidence/final_snapshot_2026_10_07.json).
 
-The next meaningful experiment is clean-corpus retraining with a fixed tokenizer/source manifest, fresh held-out contexts and predeclared quality criteria, followed by an equal-call-budget random-gating control. Preserve per-prompt outputs and separate anchor from continuation errors. The scripts named `preregistered` are retained for compatibility but are historical fixed-policy diagnostics, not an independently preregistered confirmation.
+## What larger models might change
 
-## Run tests
+Larger models can help **if** saved AR work grows faster than the continuation, policy, sampling, and KV-cache maintenance costs, while acceptable block lengths are retained. This is a conditional hypothesis, not a scaling result. More output heads, larger vocabularies, cache catch-up, memory bandwidth, batching, and kernel behavior can erase the benefit. LoRA weight merging does not remove new continuation modules. See the complete cost derivation and assumptions in [Theory](docs/THEORY_JA.md).
+
+## Start here
+
+No training is required to inspect the published claims:
 
 ```bash
-cd experiments/bpe_probe
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
-python -m pip install -r requirements.txt
-PYTHONPATH=. python -m pytest -q
+python scripts/verify_snapshot.py
+python -m unittest discover -s tests -v
 ```
 
-## Prepare corrected data
+For model tests, create a Python 3.13 environment, install the CPU dependencies and run the seven suites as documented in [Reproduction](docs/REPRODUCIBILITY.md). Training and evaluation commands are separate; do not benchmark while training is running. Archived model inputs are required to reproduce the final continuation.
 
-Use a **fresh checkout/data directory**; do not reuse old tokenizers, banks or checkpoints. The default is Project Gutenberg edition 1513, not the historical mirrored edition 1112. Original source bytes and their notices are retained locally in `source.txt`.
+The existing `experiments/` paths are preserved to avoid breaking imports and reproduction commands. `fixed_k_gate/` is a historical experiment **and a dependency** of later variable-length code; its name does not make the current policy fixed-length. Old EOB, fixed-gate, joint-content-RL and layer-fusion studies are indexed, not silently rewritten as the current design.
 
-```bash
-cd experiments/bpe_probe
-python prepare_data.py
-```
+## Historical evidence and scope
 
-The source URL is not immutable. Metadata records raw-byte, cleaned-body, tokenizer and split hashes. To enforce a known source snapshot, supply `--expected-source-sha256` with its recorded digest. Cross-version deterministic tokenization is not claimed merely because hashes are recorded.
+Early natural-language BPE numbers were affected by Gutenberg-wrapper preprocessing and inadequately matched baselines. They are retained as **historical, not headline evidence**; read [the audit](docs/RESULTS_AUDIT.md). Corrected-data negative results remain published. The all-layer MLP study was distillation-only, not all-layer backbone LoRA or an RL success.
 
-See [BPE setup and limitations](experiments/bpe_probe) before running the training scripts. Existing numerical snapshots must not be presented as measurements produced by this corrected pipeline.
+This repository ends this iteration at a documented feasibility/negative-performance snapshot. It is not a production inference engine and does not require a large-model experiment to be a useful, reproducible record. No claim of first-of-its-kind novelty, reward-hacking detection, or guaranteed acceleration is made. Possible future work is separate from the completed scope.
 
-## Related areas
+## Prior work and license
 
-The project connects multi-token prediction, self-distillation, and selective prediction/optimal stopping. These connections motivate experiments, not a novelty claim or a proof of efficiency.
+Related areas: multi-token/blockwise prediction, on-policy distillation, low-rank adaptation, adaptive computation and speculative decoding. The latter can provide exact distribution-preserving acceleration through verification/correction; this prototype does not implement that guarantee. See [primary references](docs/REFERENCES.md).
 
-## Attribution and license
-
-The model subset derives from [nanoGPT](https://github.com/karpathy/nanoGPT); its upstream MIT notice is preserved in `experiments/synthetic/third_party/nanogpt/LICENSE`. Repository code is under [MIT](LICENSE). Downloaded corpora retain their own terms and are not relicensed by this repository.
+MIT License: [LICENSE](LICENSE). The reused nanoGPT model retains its [upstream MIT license](experiments/synthetic/third_party/nanogpt/LICENSE). Project licensing does not relicense third-party source texts. Citation metadata: [CITATION.cff](CITATION.cff).

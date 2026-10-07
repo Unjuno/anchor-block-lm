@@ -1,0 +1,53 @@
+name: adaptive-k-saved-rollout-evaluation
+on:
+  push:
+    branches: [adaptive-k-rollout-evaluation]
+    paths:
+      - "experiments/adaptive_k_rl/evaluate_saved_policy.py"
+      - "experiments/adaptive_k_rl/tests/test_rollout_scoring.py"
+      - ".github/workflows/adaptive-k-rollout-evaluation.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: adaptive-k-evaluation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      TOKENIZERS_PARALLELISM: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install CPU dependencies
+        run: |
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
+          python -m pip install numpy==2.3.5 tokenizers==0.22.2 'pytest>=8'
+      - name: All four experiment test suites
+        run: |
+          (cd experiments/adaptive_k_rl && PYTHONPATH=. pytest -q tests && python -m py_compile *.py)
+          (cd experiments/fixed_k_gate && PYTHONPATH=. pytest -q tests)
+          (cd experiments/bpe_probe && PYTHONPATH=. pytest -q tests)
+          (cd experiments/synthetic && PYTHONPATH=. pytest -q tests)
+      - uses: actions/download-artifact@v4
+        with:
+          name: adaptive-k-rl-evidence
+          run-id: 37324518978
+          github-token: ${{ github.token }}
+          path: saved-evidence
+      - name: Score saved policies without retraining
+        run: python -u experiments/adaptive_k_rl/evaluate_saved_policy.py --artifact-root saved-evidence --out rollout-evaluation --prompts 16 --draws 8 --count 48
+      - uses: actions/upload-artifact@v4
+        with:
+          name: adaptive-k-rollout-evaluation
+          path: |
+            rollout-evaluation/rollout_metrics.json
+            rollout-evaluation/rollout-seed-*.npz
+          if-no-files-found: error

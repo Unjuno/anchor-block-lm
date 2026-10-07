@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "Please cite this software snapshot and its exact commit when using the code or results."
+title: "Anchor Block LM: Small-Model Adaptive Block Generation Feasibility Study"
+type: software
+authors:
+  - name: "Unjuno"
+repository-code: "https://github.com/Unjuno/anchor-block-lm"
+date-released: "2026-10-07"
+license: MIT
+abstract: "A nanoGPT research prototype with a frozen AR anchor, LoRA-adapted continuation branch and learned variable commitment length. The small-model feasibility phase is complete; low-degradation wall-clock acceleration and large-model scaling are not established."
+keywords:
+  - language-models
+  - low-rank-adaptation
+  - adaptive-computation
+  - knowledge-distillation
+  - reinforcement-learning

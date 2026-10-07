@@ -1,0 +1,72 @@
+{
+  "snapshot_date": "2026-10-07",
+  "scope": "completed small-model feasibility study; no demonstrated low-degradation speedup",
+  "source_code_commit": "22c492265668b899a5060452e207d7e7c97a7218",
+  "source_summary_commit": "b115210c4f13b56fa784f3245bb63e09173cc509",
+  "archive_filename": "dynamic_boundary_consistent_rl_results.zip",
+  "archive_sha256": "1a02fbd7ef0876ae5ead98390d3c8de567ae62c041d6ac7a2d210c640faaecd7",
+  "measurement_kind": "reanalysis of archived measurements, not a new benchmark",
+  "conditions": {
+    "cpu": "AMD EPYC 9V74 80-Core Processor", "threads": 1, "batch": 1,
+    "dtype": "float32", "kv_cache": false, "clock": "not pinned",
+    "timing_prompts": 8, "generated_tokens_per_prompt": 48,
+    "timing_repeats": 5, "summary_statistic": "median",
+    "quality_prompts": 16, "quality_draws": 4
+  },
+  "seeds": [
+    {
+      "seed": 48017,
+      "source_member": "results/seed-48017/evaluation.json",
+      "source_member_sha256": "b90a0e0f7eb253c38df9577a5027fc363cdb1ee53b0262fc3b7bf6201aa41d79",
+      "timing_tokens": 384, "timing_actor_calls": 246,
+      "ar_median_seconds": 0.27281548600001315,
+      "actor_median_seconds": 0.29164094599991586,
+      "ar_time_range_seconds": [0.26578143399990495, 0.30675327000005836],
+      "actor_time_range_seconds": [0.2788329649999923, 0.33160806000000775],
+      "quality_eval_tokens_per_call_before": 1.779837775202781,
+      "quality_eval_tokens_per_call_after": 1.5406218655967903,
+      "trace_kl_nats_per_token_before": 0.5067071680778099,
+      "trace_kl_nats_per_token_after": 0.3310600769488398,
+      "mean_k_timing": 1.5609756097560976, "speed": 0.9354498733524608,
+      "effective_overhead": 0.6686897440713533,
+      "latency_increase_percent": 6.900436729571058,
+      "throughput_drop_percent": 6.455012664753923
+    },
+    {
+      "seed": 48018,
+      "source_member": "results/seed-48018/evaluation.json",
+      "source_member_sha256": "940d510dd1ac3ca95044017e50b6639265ee548b5cbfdd46676f759c575265f7",
+      "timing_tokens": 384, "timing_actor_calls": 252,
+      "ar_median_seconds": 0.27212943099993936,
+      "actor_median_seconds": 0.29112469599999713,
+      "ar_time_range_seconds": [0.26073351299999104, 0.30071483500000795],
+      "actor_time_range_seconds": [0.27784109700007775, 0.31628367700000126],
+      "quality_eval_tokens_per_call_before": 1.5268389662027833,
+      "quality_eval_tokens_per_call_after": 1.499267935578331,
+      "trace_kl_nats_per_token_before": 0.28155743014879897,
+      "trace_kl_nats_per_token_after": 0.2610286648340055,
+      "mean_k_timing": 1.5238095238095237, "speed": 0.934752134528436,
+      "effective_overhead": 0.6301749603152877,
+      "latency_increase_percent": 6.980231770690781,
+      "throughput_drop_percent": 6.524786547156403
+    },
+    {
+      "seed": 48019,
+      "source_member": "results/seed-48019/evaluation.json",
+      "source_member_sha256": "cecaeb117d17a798e0ea85a0167fe8d4bae3a05aa16c0d8d3596a19d74d81cab",
+      "timing_tokens": 384, "timing_actor_calls": 254,
+      "ar_median_seconds": 0.26769443500006673,
+      "actor_median_seconds": 0.29037117800010037,
+      "ar_time_range_seconds": [0.2615767429999778, 0.29692981699997745],
+      "actor_time_range_seconds": [0.2795384829998966, 0.3090960769999356],
+      "quality_eval_tokens_per_call_before": 1.5983350676378771,
+      "quality_eval_tokens_per_call_after": 1.486211901306241,
+      "trace_kl_nats_per_token_before": 0.41615497035187826,
+      "trace_kl_nats_per_token_after": 0.3406765467696763,
+      "mean_k_timing": 1.5118110236220472, "speed": 0.9219042910656037,
+      "effective_overhead": 0.6398784974463962,
+      "latency_increase_percent": 8.471129779006414,
+      "throughput_drop_percent": 7.809570893439632
+    }
+  ]
+}

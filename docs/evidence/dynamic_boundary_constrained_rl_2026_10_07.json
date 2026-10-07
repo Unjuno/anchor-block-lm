@@ -1,0 +1,89 @@
+{
+  "experiment": "dynamic-boundary-constrained-rl-v1",
+  "workflow_run": 37494321837,
+  "experiment_commit": "605292b7a64e8ef38e2b74243ec65db77e952ec1",
+  "verification": {
+    "tests_passed": 109,
+    "skips": 0,
+    "compile_passed": true
+  },
+  "predeclared_rule": {
+    "mean_k_increases": true,
+    "max_probe_risk_delta_nats_per_decision": 0.05,
+    "max_sequence_kl_delta_nats_per_token": 0.02
+  },
+  "seeds": [
+    {
+      "seed": 48017,
+      "initial_mean_k": 1.5,
+      "final_mean_k": 1.703125,
+      "boundary_moved_fraction": 0.109375,
+      "boundary_up": 7,
+      "boundary_down": 0,
+      "probe_risk_delta": 0.3537880480289459,
+      "initial_tokens_per_call": 1.4869312681510165,
+      "final_tokens_per_call": 1.7038269550748752,
+      "sequence_kl_delta_nats_per_token": 0.13781624492473082,
+      "sequence_kl_delta_95ci": [
+        0.09801686846418912,
+        0.18101450165591285
+      ],
+      "final_speed_vs_pure_ar": 1.0485183705246197,
+      "train_risk_target": 0.5488220453262329,
+      "final_train_selected_risk": 0.6433609127998352,
+      "final_dual_lambda": 0.7138986557722082,
+      "predeclared_pass": false,
+      "artifact_sha256": "413b172f6d0f3246ddea55fa51e751a3ab8bdc242d19d60ff5b1a97a0a3afb48"
+    },
+    {
+      "seed": 48018,
+      "initial_mean_k": 1.5625,
+      "final_mean_k": 1.53125,
+      "boundary_moved_fraction": 0.0625,
+      "boundary_up": 1,
+      "boundary_down": 3,
+      "probe_risk_delta": -0.043257683515548706,
+      "initial_tokens_per_call": 1.5476070528967254,
+      "final_tokens_per_call": 1.517786561264822,
+      "sequence_kl_delta_nats_per_token": -0.012879559206036562,
+      "sequence_kl_delta_95ci": [
+        -0.04549467771629832,
+        0.01976680471976427
+      ],
+      "final_speed_vs_pure_ar": 0.9618305374099035,
+      "train_risk_target": 0.38980376720428467,
+      "final_train_selected_risk": 0.4518652558326721,
+      "final_dual_lambda": 3.6835751727223385,
+      "predeclared_pass": false,
+      "artifact_sha256": "154eec61f9c4c6706b7531281544839dc3ace2fe33055262d2a435a21066b37b"
+    },
+    {
+      "seed": 48019,
+      "initial_mean_k": 1.515625,
+      "final_mean_k": 1.640625,
+      "boundary_moved_fraction": 0.140625,
+      "boundary_up": 7,
+      "boundary_down": 2,
+      "probe_risk_delta": 0.12543320655822754,
+      "initial_tokens_per_call": 1.5088408644400786,
+      "final_tokens_per_call": 1.508100147275405,
+      "sequence_kl_delta_nats_per_token": 0.05073194197833192,
+      "sequence_kl_delta_95ci": [
+        0.010567537342793308,
+        0.08825922751293927
+      ],
+      "final_speed_vs_pure_ar": 0.9271350830179521,
+      "train_risk_target": 0.5318084955215454,
+      "final_train_selected_risk": 0.6224491000175476,
+      "final_dual_lambda": 3.0518333986401576,
+      "predeclared_pass": false,
+      "artifact_sha256": "0649dad1d65da078077e745d87d1a307970afea5fec5ca026ccd1f1929075a12"
+    }
+  ],
+  "interpretation": {
+    "boundary_learning_observed": true,
+    "predeclared_pass_count": 0,
+    "constraint_converged_by_final_train_risk": false,
+    "reward_hacking_proven": false
+  }
+}

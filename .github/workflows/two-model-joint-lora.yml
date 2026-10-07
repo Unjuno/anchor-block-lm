@@ -1,0 +1,61 @@
+name: two-model-joint-lora
+
+on:
+  push:
+    branches: [two-model-joint-lora-rl]
+    paths:
+      - "experiments/two_model_rl/**"
+      - ".github/workflows/two-model-joint-lora.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: two-model-joint-lora-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  experiment:
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: [48017, 48018, 48019]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      TOKENIZERS_PARALLELISM: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install CPU dependencies
+        run: |
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.10.0
+          python -m pip install numpy==2.3.5 tokenizers==0.22.2 'pytest>=8'
+      - name: All five experiment test suites
+        run: |
+          (cd experiments/two_model_rl && PYTHONPATH=. pytest -q tests && python -m py_compile *.py)
+          (cd experiments/adaptive_k_rl && PYTHONPATH=. pytest -q tests)
+          (cd experiments/fixed_k_gate && PYTHONPATH=. pytest -q tests)
+          (cd experiments/bpe_probe && PYTHONPATH=. pytest -q tests)
+          (cd experiments/synthetic && PYTHONPATH=. pytest -q tests)
+      - uses: actions/download-artifact@v4
+        with:
+          name: adaptive-k-rl-evidence
+          run-id: 37324518978
+          github-token: ${{ github.token }}
+          path: saved-evidence
+      - name: Fixed evaluator and paired LoRA training
+        run: python -u experiments/two_model_rl/run_two_model.py --artifact-root saved-evidence --out two-model-output --seed ${{ matrix.seed }}
+      - name: Preserve experiment evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: two-model-seed-${{ matrix.seed }}
+          path: two-model-output/
+          if-no-files-found: warn

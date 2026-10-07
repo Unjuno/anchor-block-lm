@@ -1,0 +1,82 @@
+{
+  "training_run_id": 37324518978,
+  "evaluation_run_id": 37326561983,
+  "evaluation_commit": "608251787e08e4e46201a05b59d2a2025d3f349b",
+  "maximum_horizon": 4,
+  "allowed_commit_lengths": [1, 2, 3, 4],
+  "training_artifact_sha256": "14f8dcd6ad5574e39d693135c329f66238d6da0153db773fb01edcd7bedd209e",
+  "evaluation_artifact_sha256": "d55843269a13477837876e8c0207cebba627bffda4c14e57f64d7fdb85de9c9e",
+  "sequence_evaluation": {
+    "prompts_per_seed": 16,
+    "draws_per_prompt": 8,
+    "tokens_per_draw": 48,
+    "no_retraining": true,
+    "teacher_is_offline_scorer_only": true,
+    "corpus": "gutenberg-body-v2, PG1513, archived train-only BPE tokenizer",
+    "holdout_status": "post-hoc evaluation on saved test contexts; not fresh confirmatory data",
+    "quality_measure": "Q-sampled sequence log(Q/P) mean estimates reverse KL; not human quality",
+    "interval": "4000 prompt-cluster bootstrap resamples; not across-training-seed uncertainty"
+  },
+  "timing_conditions": {
+    "source_run_id": 37324518978,
+    "cpu": "AMD EPYC 7763",
+    "threads": 1,
+    "dtype": "float32",
+    "batch": 1,
+    "kv_cache": false,
+    "clock": "not pinned",
+    "prompts": 8,
+    "tokens_per_prompt": 48,
+    "trials": 3,
+    "statistic": "median, different sampled continuations per trial",
+    "torch": "2.10.0+cpu",
+    "python": "3.13.15",
+    "comparison": "pure AR without continuation-head or gate computations"
+  },
+  "seeds": [
+    {
+      "seed": 48017,
+      "emitted_length_counts": {"1": 2069, "2": 1931, "3": 71, "4": 0},
+      "calls": 4071,
+      "tokens_per_call": 1.5092114959469418,
+      "sequence_reverse_kl_nats": 14.059158686817682,
+      "reverse_kl_nats_per_token": 0.2928991393087017,
+      "ci95_nats_per_token": [0.26718313926497406, 0.32085431824413413],
+      "ar_sequence_log_ratio_max_abs": 0.0,
+      "pure_ar_time_seconds_median": 0.3593429930000127,
+      "adaptive_time_seconds_median": 0.3981765340000152,
+      "speed_ratio_vs_pure_ar": 0.9024715479591748,
+      "models_unchanged": true
+    },
+    {
+      "seed": 48018,
+      "emitted_length_counts": {"1": 1687, "2": 2218, "3": 3, "4": 3},
+      "calls": 3911,
+      "tokens_per_call": 1.570953720276144,
+      "sequence_reverse_kl_nats": 14.16155792693462,
+      "reverse_kl_nats_per_token": 0.29503245681113793,
+      "ci95_nats_per_token": [0.272249687147837, 0.31581231740617],
+      "ar_sequence_log_ratio_max_abs": 0.0,
+      "pure_ar_time_seconds_median": 0.35336657700000274,
+      "adaptive_time_seconds_median": 0.3811773529999982,
+      "speed_ratio_vs_pure_ar": 0.9270397997648208,
+      "models_unchanged": true
+    },
+    {
+      "seed": 48019,
+      "emitted_length_counts": {"1": 2085, "2": 2018, "3": 5, "4": 2},
+      "calls": 4110,
+      "tokens_per_call": 1.494890510948905,
+      "sequence_reverse_kl_nats": 14.092328402079147,
+      "reverse_kl_nats_per_token": 0.2935901750433156,
+      "ci95_nats_per_token": [0.2720683950908286, 0.3146111980381287],
+      "ar_sequence_log_ratio_max_abs": 0.0,
+      "pure_ar_time_seconds_median": 0.3544448580000221,
+      "adaptive_time_seconds_median": 0.39488007300002437,
+      "speed_ratio_vs_pure_ar": 0.8976012775402831,
+      "models_unchanged": true
+    }
+  ],
+  "verification": {"adaptive_tests": 21, "fixed_dependency_tests": 13, "bpe_tests": 37, "synthetic_tests": 14, "total_passed": 85, "skips": 0},
+  "conclusion": "Variable commit length learned; near-preserved teacher distribution and real CPU speedup not achieved. Do not substitute the faulty AR timing ratios from run 37323486087."
+}

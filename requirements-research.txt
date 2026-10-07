@@ -1,0 +1,5 @@
+# Python 3.13. Install the CPU torch wheel explicitly first; see docs/REPRODUCIBILITY.md.
+torch==2.10.0
+numpy==2.3.5
+tokenizers==0.22.2
+pytest==9.0.2
