@@ -68,7 +68,7 @@ The project **cannot** claim novelty for the following components by themselves:
 - updating MTP modules while an RL-trained model changes;
 - self/on-policy distillation.
 
-The closest no-verifier inference comparison is **CLP**, which already uses the backbone's own first token plus a learned span-length predictor. The closest training-dynamics comparison is **MTP-RL**, which adapts MTP as the main RL policy changes, but uses speculative verification. **AdaMTP** changes the future-token training horizon using entropy masks; **K-Forcing** and **PTP** provide substantially stronger treatments of joint future-token modeling.
+The closest no-verifier inference comparison is **CLP**, which already uses the backbone's own first token plus a learned span-length predictor. **LEDE** also shows that reinforcement learning can dynamically choose speculation length, but within a verified self-speculative system. The closest training-dynamics comparison is **MTP-RL**, which adapts MTP as the main RL policy changes, but uses speculative verification. **AdaMTP** changes the future-token training horizon using entropy masks; **K-Forcing** and **PTP** provide substantially stronger treatments of joint future-token modeling.
 
 The narrower combination explored here is: full-horizon continuation distillation on all actor-visited contexts; a separate constrained-RL commit-length LoRA; state recollection as the continuation actor changes; and direct inference without a target verifier. The audit found no exact primary-source match to all of those properties together, but this is **not** proof of priority, patent novelty, or a first-of-its-kind result.
 
