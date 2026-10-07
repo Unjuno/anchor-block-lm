@@ -47,7 +47,7 @@ Sources: [complete final report](docs/CONSISTENT_DYNAMIC_BOUNDARY_2026_10_07.md)
 
 ## Novelty positioning after the 2026 literature audit
 
-A focused primary-source review found substantial overlap with recent work. In particular, **CLP** already combines a backbone-generated first token with a learned span-length predictor and no token-by-token verifier; **AdaMTP** and **EntMTP** adapt prediction/speculation horizon to uncertainty; **K-Forcing** and **PTP** address joint multi-token generation; and **MTP-RL** explicitly adapts MTP competence while an RL policy changes.
+A focused primary-source review found substantial overlap with recent work. In particular, **CLP** already combines a backbone-generated first token with a learned span-length predictor and no token-by-token verifier; **AdaMTP** and **EntMTP** adapt prediction/speculation horizon to uncertainty; **LEDE** uses offline RL to choose speculation length in self-speculative decoding; **K-Forcing** and **PTP** address joint multi-token generation; and **MTP-RL** explicitly adapts MTP competence while an RL policy changes.
 
 Accordingly, this repository does **not** claim novelty for "multi-token prediction", "backbone first token", "adaptive extra-token length", "on-policy distillation", or "MTP during RL" in isolation.
 
